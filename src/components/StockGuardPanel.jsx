@@ -1,4 +1,3 @@
-
 import { useState } from 'react'
 
 export default function StockGuardPanel({ onSendToChat }) {
@@ -6,7 +5,9 @@ export default function StockGuardPanel({ onSendToChat }) {
     stockName: '카카오',
     averagePrice: '',
     currentPrice: '',
-    action: '매도 고민',
+    quantity: '',
+    tradePlan: '',
+    action: '손절 고민',
     style: '스윙',
     stopLossRate: '-10',
     targetRate: '15',
@@ -19,32 +20,40 @@ export default function StockGuardPanel({ onSendToChat }) {
   }
 
   const handleSubmit = () => {
+    const displayText = `숨돌이, ${form.stockName || '이 종목'} ${form.action}을 점검해줘.`
+
     const message = `
 너는 Mind-Guard의 금융 심리 케어 챗봇 '숨돌이'야.
 아래 사용자의 투자 상황을 바탕으로, 지금 행동이 원칙 매매인지 감정 매매인지 점검해줘.
 
 [사용자 입력]
-- 종목명: ${form.stockName}
+- 종목명: ${form.stockName || '미입력'}
 - 평균 매수가: ${form.averagePrice || '미입력'}
 - 현재가: ${form.currentPrice || '미입력'}
+- 보유 수량: ${form.quantity || '미입력'}
 - 하려는 행동: ${form.action}
+- 매매 희망 수량/금액: ${form.tradePlan || '미입력'}
 - 투자 스타일: ${form.style}
 - 손절 기준: ${form.stopLossRate}%
 - 목표 수익률: ${form.targetRate}%
 - 현재 감정: ${form.emotion}
-- 추가 메모: ${form.memo || '없음'}
+- 지금 고민: ${form.memo || '없음'}
 
 [답변 규칙]
-- 800자 이내로 답변해.
-- 6문장 이하로 답변해.
+- 300자 이내로 답변해.
+- 3문장 이하로 답변해.
 - 매수/매도하라고 직접 지시하지 마.
 - "지금 사세요", "지금 파세요", "무조건 보유하세요" 같은 표현 금지.
 - 감정을 먼저 인정하고, 사용자의 기준과 현재 행동이 일치하는지 점검해.
+- 사용자가 입력한 평단가, 현재가, 손절 기준, 보유 수량, 매매 희망 수량을 함께 고려해.
 - 마지막에는 짧은 확인 질문 1개만 해.
 `.trim()
 
     if (typeof onSendToChat === 'function') {
-      onSendToChat(message)
+      onSendToChat({
+        message,
+        displayText
+      })
     }
   }
 
@@ -54,11 +63,18 @@ export default function StockGuardPanel({ onSendToChat }) {
         border: '1px solid rgba(148, 163, 184, 0.35)',
         borderRadius: '20px',
         padding: '16px',
-        background: 'rgba(255, 255, 255, 0.9)',
+        background: 'rgba(255, 255, 255, 0.92)',
         boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)'
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: '12px',
+          alignItems: 'center'
+        }}
+      >
         <div>
           <h2 style={{ margin: 0, fontSize: '18px' }}>🌬️ 숨돌이 투자 점검</h2>
           <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#64748b' }}>
@@ -108,7 +124,7 @@ export default function StockGuardPanel({ onSendToChat }) {
             type="number"
             value={form.averagePrice}
             onChange={(e) => updateForm('averagePrice', e.target.value)}
-            placeholder="예: 50000"
+            placeholder="예: 30000"
             style={inputStyle}
           />
         </label>
@@ -119,7 +135,17 @@ export default function StockGuardPanel({ onSendToChat }) {
             type="number"
             value={form.currentPrice}
             onChange={(e) => updateForm('currentPrice', e.target.value)}
-            placeholder="예: 46200"
+            placeholder="예: 12000"
+            style={inputStyle}
+          />
+        </label>
+
+        <label style={labelStyle}>
+          보유 수량
+          <input
+            value={form.quantity}
+            onChange={(e) => updateForm('quantity', e.target.value)}
+            placeholder="예: 100주"
             style={inputStyle}
           />
         </label>
@@ -132,12 +158,24 @@ export default function StockGuardPanel({ onSendToChat }) {
             style={inputStyle}
           >
             <option>매도 고민</option>
+            <option>전량 매도 고민</option>
+            <option>일부 매도 고민</option>
+            <option>손절 고민</option>
+            <option>익절 고민</option>
             <option>추가매수 고민</option>
             <option>신규매수 고민</option>
             <option>관망 고민</option>
-            <option>손절 고민</option>
-            <option>익절 고민</option>
           </select>
+        </label>
+
+        <label style={labelStyle}>
+          매매 희망 수량/금액
+          <input
+            value={form.tradePlan}
+            onChange={(e) => updateForm('tradePlan', e.target.value)}
+            placeholder="예: 전량 / 50주 / 30만원"
+            style={inputStyle}
+          />
         </label>
 
         <label style={labelStyle}>
@@ -151,26 +189,6 @@ export default function StockGuardPanel({ onSendToChat }) {
             <option>스윙</option>
             <option>중장기</option>
           </select>
-        </label>
-
-        <label style={labelStyle}>
-          손절 기준(%)
-          <input
-            type="number"
-            value={form.stopLossRate}
-            onChange={(e) => updateForm('stopLossRate', e.target.value)}
-            style={inputStyle}
-          />
-        </label>
-
-        <label style={labelStyle}>
-          목표 수익률(%)
-          <input
-            type="number"
-            value={form.targetRate}
-            onChange={(e) => updateForm('targetRate', e.target.value)}
-            style={inputStyle}
-          />
         </label>
 
         <label style={labelStyle}>
@@ -188,6 +206,28 @@ export default function StockGuardPanel({ onSendToChat }) {
             <option>멘붕</option>
           </select>
         </label>
+
+        <label style={labelStyle}>
+          손절 기준(%)
+          <input
+            type="number"
+            value={form.stopLossRate}
+            onChange={(e) => updateForm('stopLossRate', e.target.value)}
+            placeholder="예: -10"
+            style={inputStyle}
+          />
+        </label>
+
+        <label style={labelStyle}>
+          목표 수익률(%)
+          <input
+            type="number"
+            value={form.targetRate}
+            onChange={(e) => updateForm('targetRate', e.target.value)}
+            placeholder="예: 15"
+            style={inputStyle}
+          />
+        </label>
       </div>
 
       <label style={{ ...labelStyle, marginTop: '10px' }}>
@@ -195,7 +235,7 @@ export default function StockGuardPanel({ onSendToChat }) {
         <input
           value={form.memo}
           onChange={(e) => updateForm('memo', e.target.value)}
-          placeholder="예: 더 떨어질까 봐 무서워서 지금 팔고 싶어요."
+          placeholder="예: 5년 들고 있었는데 더는 못 보겠고 그냥 팔고 싶어요."
           style={inputStyle}
         />
       </label>
