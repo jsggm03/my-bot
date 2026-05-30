@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 export default function StockGuardPanel({ onSendToChat }) {
   const [form, setForm] = useState({
@@ -7,8 +7,8 @@ export default function StockGuardPanel({ onSendToChat }) {
     currentPrice: '',
     quantity: '',
     tradeQuantity: '',
-    action: '추가매수 고민',
-    style: '스윙',
+    action: '더 살까?',
+    horizon: '며칠~몇 주 보고 있어요',
     stopLossRate: '-10',
     targetRate: '15',
     emotion: '불안',
@@ -18,6 +18,9 @@ export default function StockGuardPanel({ onSendToChat }) {
   const [stockData, setStockData] = useState(null)
   const [loadingStock, setLoadingStock] = useState(false)
   const [stockError, setStockError] = useState('')
+
+  const debounceTimerRef = useRef(null)
+  const lastLoadedNameRef = useRef('')
 
   const updateForm = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -38,6 +41,20 @@ export default function StockGuardPanel({ onSendToChat }) {
     const n = Number(value)
     if (!Number.isFinite(n)) return '-'
     return `${n.toFixed(2)}%`
+  }
+
+  const getActionMeaning = () => {
+    if (form.action === '더 살까?') return '추가매수 고민'
+    if (form.action === '팔까?') return '매도 고민'
+    if (form.action === '기다릴까?') return '관망 고민'
+    return form.action
+  }
+
+  const getInvestmentStyle = () => {
+    if (form.horizon === '오늘 안에 결정하고 싶어요') return '단타'
+    if (form.horizon === '며칠~몇 주 보고 있어요') return '스윙'
+    if (form.horizon === '몇 달 이상 들고 갈 생각이에요') return '중장기'
+    return '미입력'
   }
 
   const analysis = useMemo(() => {
@@ -74,20 +91,23 @@ export default function StockGuardPanel({ onSendToChat }) {
       quantity > 0 && tradeQuantity > 0 ? Math.max(quantity - tradeQuantity, 0) : null
 
     let decisionHint = '기준 점검 필요'
+    const actionMeaning = getActionMeaning()
+    const change5d = stockData?.summary?.change5d
+    const change20d = stockData?.summary?.change20d
 
-    if (form.action.includes('추가매수') && stockData?.summary?.change20d <= -10) {
+    if (actionMeaning.includes('추가매수') && change20d <= -10) {
       decisionHint = '하락 구간 추가매수 점검 필요'
-    } else if (form.action.includes('매도') && stopLossReached) {
+    } else if (actionMeaning.includes('매도') && stopLossReached) {
       decisionHint = '손절 기준 도달 가능성'
     } else if (
-      form.action.includes('매도') &&
+      actionMeaning.includes('매도') &&
       !stopLossReached &&
       ['불안', '공포', '분노', '멘붕'].includes(form.emotion)
     ) {
       decisionHint = '감정 매도 가능성'
-    } else if (form.action.includes('매수') && stockData?.summary?.change5d >= 8) {
+    } else if (actionMeaning.includes('매수') && change5d >= 8) {
       decisionHint = '추격매수 가능성'
-    } else if (targetReached && form.action.includes('매도')) {
+    } else if (targetReached && actionMeaning.includes('매도')) {
       decisionHint = '목표 수익 도달 가능성'
     }
 
@@ -112,11 +132,13 @@ export default function StockGuardPanel({ onSendToChat }) {
     }
   }, [form, stockData])
 
-  const handleLoadStock = async () => {
-    const name = form.stockName.trim()
+  const loadStock = async (name) => {
+    const trimmedName = String(name || '').trim()
 
-    if (!name) {
-      setStockError('종목명을 먼저 입력해 주세요.')
+    if (trimmedName.length < 2) {
+      setStockData(null)
+      setStockError('')
+      updateForm('currentPrice', '')
       return
     }
 
@@ -124,13 +146,14 @@ export default function StockGuardPanel({ onSendToChat }) {
     setStockError('')
 
     try {
-      const response = await fetch(`/api/stock?name=${encodeURIComponent(name)}`)
+      const response = await fetch(`/api/stock?name=${encodeURIComponent(trimmedName)}`)
       const data = await response.json()
 
       if (!response.ok || !data.success) {
         throw new Error(data.message || data.kisMessage || '주가 데이터를 불러오지 못했습니다.')
       }
 
+      lastLoadedNameRef.current = trimmedName
       setStockData(data)
 
       if (data.summary?.currentPrice) {
@@ -138,11 +161,32 @@ export default function StockGuardPanel({ onSendToChat }) {
       }
     } catch (error) {
       setStockData(null)
+      updateForm('currentPrice', '')
       setStockError(error.message || '주가 데이터를 불러오는 중 오류가 발생했습니다.')
     } finally {
       setLoadingStock(false)
     }
   }
+
+  useEffect(() => {
+    const name = form.stockName.trim()
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      if (name && name !== lastLoadedNameRef.current) {
+        loadStock(name)
+      }
+    }, 800)
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [form.stockName])
 
   const buildDataSummary = () => {
     if (!stockData?.summary) {
@@ -204,7 +248,9 @@ export default function StockGuardPanel({ onSendToChat }) {
   }
 
   const handleSubmit = () => {
-    const displayText = `숨돌이, ${form.stockName || '이 종목'} ${form.action}을 점검해줘.`
+    const actionMeaning = getActionMeaning()
+    const investmentStyle = getInvestmentStyle()
+    const displayText = `숨돌이, ${form.stockName || '이 종목'} ${actionMeaning}을 점검해줘.`
 
     const message = `
 너는 Mind-Guard의 금융 심리 케어 챗봇 '숨돌이'야.
@@ -215,9 +261,11 @@ export default function StockGuardPanel({ onSendToChat }) {
 - 평균 매수가: ${form.averagePrice || '미입력'}
 - 현재가: ${form.currentPrice || '미입력'}
 - 보유 수량: ${form.quantity || '미입력'}주
-- 하려는 행동: ${form.action}
+- 사용자가 고른 행동: ${form.action}
+- 해석된 행동: ${actionMeaning}
 - 매매 희망 수량: ${form.tradeQuantity || '미입력'}주
-- 투자 스타일: ${form.style}
+- 사용자가 고른 투자 기간: ${form.horizon}
+- 해석된 투자 스타일: ${investmentStyle}
 - 손절 기준: ${form.stopLossRate}%
 - 목표 수익률: ${form.targetRate}%
 - 현재 감정: ${form.emotion}
@@ -228,13 +276,14 @@ ${buildDataSummary()}
 ${buildAnalysisSummary()}
 
 [답변 규칙]
-- 350자 이내로 답변해.
-- 3문장 이하로 답변해.
+- 600~800자 이내로 답변해.
+- 5~7문장 이하로 답변해.
+- 첫 문장은 사용자의 감정을 인정하는 문장으로 시작해.
+- 현재 손익률, 손절 기준 도달 여부, 최근 20거래일 흐름, 고점 대비 하락률, 추가매수 후 평단을 반드시 고려해.
 - 매수/매도하라고 직접 지시하지 마.
 - "지금 사세요", "지금 파세요", "무조건 보유하세요" 같은 표현 금지.
-- 현재 손익률, 손절 기준 도달 여부, 최근 20거래일 흐름, 추가매수 후 평단을 반드시 고려해.
-- 감정을 먼저 인정하고, 원칙 매매인지 감정 매매인지 점검해.
-- 마지막에는 짧은 확인 질문 1개만 해.
+- 특정 결과를 예측하지 말고, 현재 데이터가 보여주는 위험과 점검 포인트를 설명해.
+- 답변 마지막에는 사용자가 바로 생각할 수 있는 확인 질문 1개만 던져.
 `.trim()
 
     if (typeof onSendToChat === 'function') {
@@ -262,6 +311,10 @@ ${buildAnalysisSummary()}
             종목 데이터와 내 투자 기준을 함께 확인해요.
           </p>
         </div>
+
+        <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700 }}>
+          {loadingStock ? '종목 데이터 불러오는 중...' : stockData ? '데이터 연결됨' : '종목명 입력 시 자동 조회'}
+        </div>
       </div>
 
       <div style={gridStyle}>
@@ -275,21 +328,6 @@ ${buildAnalysisSummary()}
           />
         </label>
 
-        <div style={{ display: 'flex', alignItems: 'end' }}>
-          <button
-            type="button"
-            onClick={handleLoadStock}
-            disabled={loadingStock}
-            style={{
-              ...secondaryButtonStyle,
-              background: loadingStock ? '#cbd5e1' : '#334155',
-              cursor: loadingStock ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {loadingStock ? '불러오는 중...' : '현재가 불러오기'}
-          </button>
-        </div>
-
         <label style={labelStyle}>
           평균 매수가
           <input
@@ -297,17 +335,6 @@ ${buildAnalysisSummary()}
             value={form.averagePrice}
             onChange={(e) => updateForm('averagePrice', e.target.value)}
             placeholder="예: 50000"
-            style={inputStyle}
-          />
-        </label>
-
-        <label style={labelStyle}>
-          현재가
-          <input
-            type="number"
-            value={form.currentPrice}
-            onChange={(e) => updateForm('currentPrice', e.target.value)}
-            placeholder="API로 자동 입력"
             style={inputStyle}
           />
         </label>
@@ -324,24 +351,6 @@ ${buildAnalysisSummary()}
         </label>
 
         <label style={labelStyle}>
-          하려는 행동
-          <select
-            value={form.action}
-            onChange={(e) => updateForm('action', e.target.value)}
-            style={inputStyle}
-          >
-            <option>매도 고민</option>
-            <option>전량 매도 고민</option>
-            <option>일부 매도 고민</option>
-            <option>손절 고민</option>
-            <option>익절 고민</option>
-            <option>추가매수 고민</option>
-            <option>신규매수 고민</option>
-            <option>관망 고민</option>
-          </select>
-        </label>
-
-        <label style={labelStyle}>
           매매 희망 수량(주)
           <input
             type="number"
@@ -353,15 +362,28 @@ ${buildAnalysisSummary()}
         </label>
 
         <label style={labelStyle}>
-          투자 스타일
+          지금 고민
           <select
-            value={form.style}
-            onChange={(e) => updateForm('style', e.target.value)}
+            value={form.action}
+            onChange={(e) => updateForm('action', e.target.value)}
             style={inputStyle}
           >
-            <option>단타</option>
-            <option>스윙</option>
-            <option>중장기</option>
+            <option>더 살까?</option>
+            <option>팔까?</option>
+            <option>기다릴까?</option>
+          </select>
+        </label>
+
+        <label style={labelStyle}>
+          투자 기간
+          <select
+            value={form.horizon}
+            onChange={(e) => updateForm('horizon', e.target.value)}
+            style={inputStyle}
+          >
+            <option>오늘 안에 결정하고 싶어요</option>
+            <option>며칠~몇 주 보고 있어요</option>
+            <option>몇 달 이상 들고 갈 생각이에요</option>
           </select>
         </label>
 
@@ -602,15 +624,6 @@ const primaryButtonStyle = {
   color: 'white',
   cursor: 'pointer',
   whiteSpace: 'nowrap',
-  fontWeight: 700
-}
-
-const secondaryButtonStyle = {
-  width: '100%',
-  border: 0,
-  borderRadius: '12px',
-  padding: '10px 12px',
-  color: 'white',
   fontWeight: 700
 }
 
