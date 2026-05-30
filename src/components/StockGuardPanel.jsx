@@ -15,8 +15,71 @@ export default function StockGuardPanel({ onSendToChat }) {
     memo: ''
   })
 
+  const [stockData, setStockData] = useState(null)
+  const [loadingStock, setLoadingStock] = useState(false)
+  const [stockError, setStockError] = useState('')
+
   const updateForm = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const formatNumber = (value) => {
+    const n = Number(value)
+    if (!Number.isFinite(n)) return '-'
+    return n.toLocaleString()
+  }
+
+  const handleLoadStock = async () => {
+    const name = form.stockName.trim()
+
+    if (!name) {
+      setStockError('종목명을 먼저 입력해 주세요.')
+      return
+    }
+
+    setLoadingStock(true)
+    setStockError('')
+
+    try {
+      const response = await fetch(`/api/stock?name=${encodeURIComponent(name)}`)
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || data.kisMessage || '주가 데이터를 불러오지 못했습니다.')
+      }
+
+      setStockData(data)
+
+      if (data.summary?.currentPrice) {
+        updateForm('currentPrice', String(data.summary.currentPrice))
+      }
+    } catch (error) {
+      setStockData(null)
+      setStockError(error.message || '주가 데이터를 불러오는 중 오류가 발생했습니다.')
+    } finally {
+      setLoadingStock(false)
+    }
+  }
+
+  const buildDataSummary = () => {
+    if (!stockData?.summary) {
+      return '주가 데이터: 아직 불러오지 않음'
+    }
+
+    const { stock, current, summary } = stockData
+
+    return `
+[주가 데이터]
+- 확인 종목: ${stock.name} (${stock.code}, ${stock.market})
+- 현재가: ${summary.currentPrice}원
+- 전일 등락률: ${current?.previousDayRate ?? '정보 없음'}%
+- 최근 5거래일 수익률: ${summary.change5d}%
+- 최근 20거래일 수익률: ${summary.change20d}%
+- 90일 고점: ${summary.high90d}원
+- 90일 저점: ${summary.low90d}원
+- 90일 고점 대비 하락률: ${summary.drawdownFromHigh}%
+- 90일 저점 대비 반등률: ${summary.reboundFromLow}%
+`.trim()
   }
 
   const handleSubmit = () => {
@@ -24,7 +87,7 @@ export default function StockGuardPanel({ onSendToChat }) {
 
     const message = `
 너는 Mind-Guard의 금융 심리 케어 챗봇 '숨돌이'야.
-아래 사용자의 투자 상황을 바탕으로, 지금 행동이 원칙 매매인지 감정 매매인지 점검해줘.
+아래 사용자의 투자 상황과 주가 데이터를 바탕으로, 지금 행동이 원칙 매매인지 감정 매매인지 점검해줘.
 
 [사용자 입력]
 - 종목명: ${form.stockName || '미입력'}
@@ -39,13 +102,15 @@ export default function StockGuardPanel({ onSendToChat }) {
 - 현재 감정: ${form.emotion}
 - 지금 고민: ${form.memo || '없음'}
 
+${buildDataSummary()}
+
 [답변 규칙]
-- 300자 이내로 답변해.
+- 350자 이내로 답변해.
 - 3문장 이하로 답변해.
 - 매수/매도하라고 직접 지시하지 마.
 - "지금 사세요", "지금 파세요", "무조건 보유하세요" 같은 표현 금지.
-- 감정을 먼저 인정하고, 사용자의 기준과 현재 행동이 일치하는지 점검해.
-- 사용자가 입력한 평단가, 현재가, 손절 기준, 보유 수량, 매매 희망 수량을 함께 고려해.
+- 사용자의 평균 매수가, 현재가, 손절 기준, 최근 5일/20일 흐름을 반드시 함께 고려해.
+- 감정을 먼저 인정하고, 원칙 매매인지 감정 매매인지 점검해.
 - 마지막에는 짧은 확인 질문 1개만 해.
 `.trim()
 
@@ -78,7 +143,7 @@ export default function StockGuardPanel({ onSendToChat }) {
         <div>
           <h2 style={{ margin: 0, fontSize: '18px' }}>🌬️ 숨돌이 투자 점검</h2>
           <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#64748b' }}>
-            매매 전, 내 기준과 감정 상태를 먼저 확인해요.
+            종목 데이터를 불러온 뒤, 내 기준과 감정 상태를 함께 확인해요.
           </p>
         </div>
 
@@ -118,13 +183,33 @@ export default function StockGuardPanel({ onSendToChat }) {
           />
         </label>
 
+        <div style={{ display: 'flex', alignItems: 'end' }}>
+          <button
+            type="button"
+            onClick={handleLoadStock}
+            disabled={loadingStock}
+            style={{
+              width: '100%',
+              border: 0,
+              borderRadius: '12px',
+              padding: '10px 12px',
+              background: loadingStock ? '#cbd5e1' : '#334155',
+              color: 'white',
+              fontWeight: 700,
+              cursor: loadingStock ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {loadingStock ? '불러오는 중...' : '현재가 불러오기'}
+          </button>
+        </div>
+
         <label style={labelStyle}>
           평균 매수가
           <input
             type="number"
             value={form.averagePrice}
             onChange={(e) => updateForm('averagePrice', e.target.value)}
-            placeholder="예: 30000"
+            placeholder="예: 50000"
             style={inputStyle}
           />
         </label>
@@ -135,7 +220,7 @@ export default function StockGuardPanel({ onSendToChat }) {
             type="number"
             value={form.currentPrice}
             onChange={(e) => updateForm('currentPrice', e.target.value)}
-            placeholder="예: 12000"
+            placeholder="API로 자동 입력"
             style={inputStyle}
           />
         </label>
@@ -230,6 +315,38 @@ export default function StockGuardPanel({ onSendToChat }) {
         </label>
       </div>
 
+      {stockError && (
+        <p
+          style={{
+            margin: '10px 0 0',
+            padding: '10px 12px',
+            borderRadius: '12px',
+            background: '#fef2f2',
+            color: '#b91c1c',
+            fontSize: '13px',
+            fontWeight: 700
+          }}
+        >
+          {stockError}
+        </p>
+      )}
+
+      {stockData?.summary && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+            gap: '8px',
+            marginTop: '10px'
+          }}
+        >
+          <InfoCard label="현재가" value={`${formatNumber(stockData.summary.currentPrice)}원`} />
+          <InfoCard label="5거래일" value={`${stockData.summary.change5d}%`} />
+          <InfoCard label="20거래일" value={`${stockData.summary.change20d}%`} />
+          <InfoCard label="고점 대비" value={`${stockData.summary.drawdownFromHigh}%`} />
+        </div>
+      )}
+
       <label style={{ ...labelStyle, marginTop: '10px' }}>
         지금 고민 한 줄
         <input
@@ -240,6 +357,24 @@ export default function StockGuardPanel({ onSendToChat }) {
         />
       </label>
     </section>
+  )
+}
+
+function InfoCard({ label, value }) {
+  return (
+    <div
+      style={{
+        borderRadius: '12px',
+        padding: '10px 12px',
+        background: '#f8fafc',
+        border: '1px solid rgba(148, 163, 184, 0.25)'
+      }}
+    >
+      <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>{label}</div>
+      <div style={{ marginTop: '4px', fontSize: '15px', color: '#0f172a', fontWeight: 800 }}>
+        {value}
+      </div>
+    </div>
   )
 }
 
