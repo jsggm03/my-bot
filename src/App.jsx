@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import AvatarPanel from './components/AvatarPanel'
 import ChatPanel from './components/ChatPanel'
 import AuthModal from './components/AuthModal'
+import StockGuardPanel from './components/StockGuardPanel'
 import styles from './App.module.css'
 import { newSessionId, saveChat, getUser, clearAuth, verifyToken } from './lib/api'
 import { MicRecorder, isMicRecorderSupported } from './lib/stt'
@@ -652,21 +653,25 @@ export default function App() {
   const isChatConnected = status !== 'idle' && status !== 'connecting'
 
   return (
-    <div className={styles.app}>
-      <AvatarPanel
-        status={status}
-        mode={conversationMode}
-        onModeChange={changeConversationMode}
-        vrmAvatarRef={vrmAvatarRef}
-        onAvatarReady={handleAvatarReady}
-        userVideoRef={userVideoRef}
-        videoReady={videoReady}
-        cameraActive={Boolean(cameraStream)}
-        onStart={startConversation}
-        onStop={stopAvatar}
-        onInterrupt={interruptAvatar}
-        isListening={isListening}
-      />
+  <div className={styles.app}>
+    <AvatarPanel
+      status={status}
+      mode={conversationMode}
+      onModeChange={changeConversationMode}
+      vrmAvatarRef={vrmAvatarRef}
+      onAvatarReady={handleAvatarReady}
+      userVideoRef={userVideoRef}
+      videoReady={videoReady}
+      cameraActive={Boolean(cameraStream)}
+      onStart={startConversation}
+      onStop={stopAvatar}
+      onInterrupt={interruptAvatar}
+      isListening={isListening}
+    />
+
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
+      <StockGuardPanel onSendToChat={sendMessage} />
+
       <ChatPanel
         messages={messages}
         isProcessing={isProcessing}
@@ -683,11 +688,13 @@ export default function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
       />
-      <AuthModal
-        open={authOpen}
-        onClose={() => setAuthOpen(false)}
-        onSuccess={(u) => setUser(u)}
-      />
     </div>
-  )
+
+    <AuthModal
+      open={authOpen}
+      onClose={() => setAuthOpen(false)}
+      onSuccess={(u) => setUser(u)}
+    />
+  </div>
+)
 }
