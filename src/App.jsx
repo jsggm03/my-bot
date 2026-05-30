@@ -669,8 +669,24 @@ export default function App() {
       isListening={isListening}
     />
 
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
-      <StockGuardPanel onSendToChat={sendMessage} />
+    <div
+      style={{
+        flex: '1 1 0%',
+        minWidth: 0,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}
+    >
+      <div
+        style={{
+          flexShrink: 0,
+          padding: '12px 16px 0 16px'
+        }}
+      >
+        <StockGuardPanel onSendToChat={sendMessage} />
+      </div>
 
       <ChatPanel
         messages={messages}
