@@ -28,12 +28,6 @@ export default function StockGuardPanel({ onSendToChat }) {
     return Number.isFinite(n) ? n : 0
   }
 
-  const formatNumber = (value) => {
-    const n = Number(value)
-    if (!Number.isFinite(n)) return '-'
-    return n.toLocaleString()
-  }
-
   const formatWon = (value) => {
     const n = Number(value)
     if (!Number.isFinite(n)) return '-'
@@ -85,7 +79,11 @@ export default function StockGuardPanel({ onSendToChat }) {
       decisionHint = '하락 구간 추가매수 점검 필요'
     } else if (form.action.includes('매도') && stopLossReached) {
       decisionHint = '손절 기준 도달 가능성'
-    } else if (form.action.includes('매도') && !stopLossReached && ['불안', '공포', '분노', '멘붕'].includes(form.emotion)) {
+    } else if (
+      form.action.includes('매도') &&
+      !stopLossReached &&
+      ['불안', '공포', '분노', '멘붕'].includes(form.emotion)
+    ) {
       decisionHint = '감정 매도 가능성'
     } else if (form.action.includes('매수') && stockData?.summary?.change5d >= 8) {
       decisionHint = '추격매수 가능성'
@@ -173,18 +171,34 @@ export default function StockGuardPanel({ onSendToChat }) {
 - 현재 손익률: ${
       analysis.profitRate !== null ? `${analysis.profitRate.toFixed(2)}%` : '계산 불가'
     }
-- 현재 평가금액: ${analysis.holdingValue !== null ? `${Math.round(analysis.holdingValue)}원` : '계산 불가'}
-- 현재 평가손익: ${analysis.profitAmount !== null ? `${Math.round(analysis.profitAmount)}원` : '계산 불가'}
-- 손절 기준 가격: ${analysis.stopLossPrice !== null ? `${Math.round(analysis.stopLossPrice)}원` : '계산 불가'}
+- 현재 평가금액: ${
+      analysis.holdingValue !== null ? `${Math.round(analysis.holdingValue)}원` : '계산 불가'
+    }
+- 현재 평가손익: ${
+      analysis.profitAmount !== null ? `${Math.round(analysis.profitAmount)}원` : '계산 불가'
+    }
+- 손절 기준 가격: ${
+      analysis.stopLossPrice !== null ? `${Math.round(analysis.stopLossPrice)}원` : '계산 불가'
+    }
 - 손절 기준 도달 여부: ${analysis.stopLossReached ? '도달' : '미도달 또는 계산 불가'}
-- 목표 가격: ${analysis.targetPrice !== null ? `${Math.round(analysis.targetPrice)}원` : '계산 불가'}
+- 목표 가격: ${
+      analysis.targetPrice !== null ? `${Math.round(analysis.targetPrice)}원` : '계산 불가'
+    }
 - 목표 수익률 도달 여부: ${analysis.targetReached ? '도달' : '미도달 또는 계산 불가'}
 - 추가매수 후 예상 평단: ${
-      analysis.newAverageAfterBuy !== null ? `${Math.round(analysis.newAverageAfterBuy)}원` : '계산 불가'
+      analysis.newAverageAfterBuy !== null
+        ? `${Math.round(analysis.newAverageAfterBuy)}원`
+        : '계산 불가'
     }
-- 추가매수 예상 금액: ${analysis.addedBuyAmount !== null ? `${Math.round(analysis.addedBuyAmount)}원` : '계산 불가'}
-- 일부 매도 예상 금액: ${analysis.sellAmount !== null ? `${Math.round(analysis.sellAmount)}원` : '계산 불가'}
-- 일부 매도 후 남는 수량: ${analysis.remainingQuantity !== null ? `${analysis.remainingQuantity}주` : '계산 불가'}
+- 추가매수 예상 금액: ${
+      analysis.addedBuyAmount !== null ? `${Math.round(analysis.addedBuyAmount)}원` : '계산 불가'
+    }
+- 일부 매도 예상 금액: ${
+      analysis.sellAmount !== null ? `${Math.round(analysis.sellAmount)}원` : '계산 불가'
+    }
+- 일부 매도 후 남는 수량: ${
+      analysis.remainingQuantity !== null ? `${analysis.remainingQuantity}주` : '계산 불가'
+    }
 - 판단 힌트: ${analysis.decisionHint}
 `.trim()
   }
@@ -248,10 +262,6 @@ ${buildAnalysisSummary()}
             종목 데이터와 내 투자 기준을 함께 확인해요.
           </p>
         </div>
-
-        <button type="button" onClick={handleSubmit} style={primaryButtonStyle}>
-          숨돌이에게 점검받기
-        </button>
       </div>
 
       <div style={gridStyle}>
@@ -431,15 +441,42 @@ ${buildAnalysisSummary()}
         />
       </div>
 
-      <label style={{ ...labelStyle, marginTop: '10px' }}>
-        지금 고민 한 줄
-        <input
-          value={form.memo}
-          onChange={(e) => updateForm('memo', e.target.value)}
-          placeholder="예: 5년 들고 있었는데 결과가 이거라 불안해요."
-          style={inputStyle}
-        />
-      </label>
+      <div
+        style={{
+          display: 'flex',
+          gap: '10px',
+          alignItems: 'end',
+          marginTop: '10px'
+        }}
+      >
+        <label style={{ ...labelStyle, flex: 1 }}>
+          지금 고민 한 줄
+          <input
+            value={form.memo}
+            onChange={(e) => updateForm('memo', e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                e.preventDefault()
+                handleSubmit()
+              }
+            }}
+            placeholder="예: 5년 들고 있었는데 결과가 이거라 불안해요."
+            style={inputStyle}
+          />
+        </label>
+
+        <button
+          type="button"
+          onClick={handleSubmit}
+          style={{
+            ...primaryButtonStyle,
+            height: '38px',
+            padding: '0 16px'
+          }}
+        >
+          점검받기
+        </button>
+      </div>
     </section>
   )
 }
