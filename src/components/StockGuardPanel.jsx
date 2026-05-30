@@ -18,7 +18,14 @@ export default function StockGuardPanel({ onSendToChat }) {
         boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)'
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: '12px',
+          alignItems: 'center'
+        }}
+      >
         <div>
           <h2 style={{ margin: 0, fontSize: '18px' }}>🌬️ 숨돌이 투자 점검</h2>
           <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#64748b' }}>
