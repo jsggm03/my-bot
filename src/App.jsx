@@ -259,8 +259,18 @@ export default function App() {
   // ─── 메시지 전송 (Streaming SSE) ──────────────────────────────────────
   // /api/chat-stream 에서 토큰 단위 받음. 문장 boundary 만날 때마다 enqueueTTS().
   const sendMessage = useCallback(async (userText) => {
-    const text = userText.trim()
-    if (!text || isProcessingRef.current) return
+  const messagePayload =
+    typeof userText === 'string'
+      ? { message: userText, displayText: userText }
+      : {
+          message: userText?.message || '',
+          displayText: userText?.displayText || userText?.message || ''
+        }
+
+  const text = String(messagePayload.message || '').trim()
+  const displayText = String(messagePayload.displayText || text).trim()
+
+  if (!text || isProcessingRef.current) return
     if (isSpeakingRef.current) {
       console.warn('[echo guard] sendMessage suppressed during avatar speaking:', text.slice(0, 30))
       return
@@ -268,9 +278,12 @@ export default function App() {
     isProcessingRef.current = true
     setIsProcessing(true)
 
-    setMessages(prev => [...prev, { role: 'user', text }])
-    historyRef.current = [...historyRef.current, { role: 'user', content: text }]
-    if (sessionIdRef.current) saveChat(sessionIdRef.current, 'user', text)
+    setMessages((prev) => [...prev, { role: 'user', text: displayText }])
+historyRef.current = [...historyRef.current, { role: 'user', content: text }]
+
+if (sessionIdRef.current) {
+  saveChat(sessionIdRef.current, 'user', displayText)
+}
     setMessages(prev => [...prev, { role: 'assistant', text: '' }])
 
     let accumulated = ''
