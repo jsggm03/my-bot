@@ -5,7 +5,6 @@
   overflow: hidden;
 }
 
-/* 기존 앱 구조 fallback */
 @media (max-width: 768px) {
   .app {
     flex-direction: column;
@@ -14,8 +13,6 @@
 
 /* ─────────────────────────────
    Mind Guard 전체 레이아웃
-   왼쪽/가운데: 투자 대시보드
-   오른쪽: 숨돌이 코치 영역
 ───────────────────────────── */
 
 .mindGuardApp {
@@ -29,7 +26,7 @@
   overflow: hidden;
 }
 
-/* 오른쪽 숨돌이 영역 */
+/* 오른쪽 숨돌이 코치 영역 */
 .mindGuardCoachPanel {
   min-width: 0;
   height: 100%;
@@ -41,13 +38,13 @@
   overflow: hidden;
 }
 
-/* 상단: 텍스트/음성/아바타 모드 영역 */
+/* 상단 AvatarPanel 영역 */
 .mindGuardAvatarSlot {
-  flex: 0 0 clamp(240px, 34vh, 340px);
   min-height: 0;
   overflow: hidden;
   border-bottom: 1px solid rgba(120, 83, 45, 0.12);
   background: #fffaf3;
+  transition: flex-basis 0.2s ease;
 }
 
 .mindGuardAvatarSlot > * {
@@ -56,7 +53,7 @@
   min-height: 0 !important;
 }
 
-/* 하단: 실제 대화창 */
+/* 하단 ChatPanel 영역 */
 .mindGuardChatSlot {
   flex: 1 1 auto;
   min-height: 0;
@@ -73,30 +70,65 @@
 }
 
 /* ─────────────────────────────
-   화면 폭 대응
+   모드별 오른쪽 영역 높이
+   텍스트: 상단 작게
+   음성: 중간
+   아바타: 크게
+───────────────────────────── */
+
+.coachTextMode .mindGuardAvatarSlot {
+  flex: 0 0 126px;
+}
+
+.coachVoiceMode .mindGuardAvatarSlot {
+  flex: 0 0 280px;
+}
+
+.coachAvatarMode .mindGuardAvatarSlot {
+  flex: 0 0 360px;
+}
+
+/* ─────────────────────────────
+   반응형
 ───────────────────────────── */
 
 @media (max-width: 1400px) {
   .mindGuardApp {
-    grid-template-columns: minmax(0, 1fr) 480px;
+    grid-template-columns: minmax(0, 1fr) 500px;
   }
 
-  .mindGuardAvatarSlot {
-    flex-basis: clamp(220px, 32vh, 310px);
+  .coachTextMode .mindGuardAvatarSlot {
+    flex-basis: 120px;
+  }
+
+  .coachVoiceMode .mindGuardAvatarSlot {
+    flex-basis: 250px;
+  }
+
+  .coachAvatarMode .mindGuardAvatarSlot {
+    flex-basis: 320px;
   }
 }
 
 @media (max-width: 1180px) {
   .mindGuardApp {
-    grid-template-columns: minmax(0, 1fr) 440px;
+    grid-template-columns: minmax(0, 1fr) 460px;
   }
 
-  .mindGuardAvatarSlot {
-    flex-basis: 260px;
+  .coachTextMode .mindGuardAvatarSlot {
+    flex-basis: 116px;
+  }
+
+  .coachVoiceMode .mindGuardAvatarSlot {
+    flex-basis: 230px;
+  }
+
+  .coachAvatarMode .mindGuardAvatarSlot {
+    flex-basis: 300px;
   }
 }
 
-/* 태블릿/작은 노트북: 위는 투자 대시보드, 아래는 숨돌이 */
+/* 태블릿/모바일: 대시보드 아래에 코치 영역 */
 @media (max-width: 980px) {
   .mindGuardApp {
     height: auto;
@@ -111,8 +143,16 @@
     border-top: 1px solid rgba(120, 83, 45, 0.14);
   }
 
-  .mindGuardAvatarSlot {
-    flex: 0 0 260px;
+  .coachTextMode .mindGuardAvatarSlot {
+    flex-basis: 116px;
+  }
+
+  .coachVoiceMode .mindGuardAvatarSlot {
+    flex-basis: 240px;
+  }
+
+  .coachAvatarMode .mindGuardAvatarSlot {
+    flex-basis: 300px;
   }
 
   .mindGuardChatSlot {
@@ -120,21 +160,21 @@
   }
 }
 
-/* 모바일 */
 @media (max-width: 640px) {
-  .mindGuardApp {
-    height: auto;
-    min-height: 100vh;
-    display: block;
-    overflow: auto;
-  }
-
   .mindGuardCoachPanel {
     min-height: 680px;
   }
 
-  .mindGuardAvatarSlot {
-    flex: 0 0 220px;
+  .coachTextMode .mindGuardAvatarSlot {
+    flex-basis: 112px;
+  }
+
+  .coachVoiceMode .mindGuardAvatarSlot {
+    flex-basis: 230px;
+  }
+
+  .coachAvatarMode .mindGuardAvatarSlot {
+    flex-basis: 280px;
   }
 
   .mindGuardChatSlot {
@@ -142,10 +182,17 @@
   }
 }
 
-/* 아주 작은 모바일 */
 @media (max-width: 420px) {
-  .mindGuardAvatarSlot {
-    flex: 0 0 200px;
+  .coachTextMode .mindGuardAvatarSlot {
+    flex-basis: 108px;
+  }
+
+  .coachVoiceMode .mindGuardAvatarSlot {
+    flex-basis: 220px;
+  }
+
+  .coachAvatarMode .mindGuardAvatarSlot {
+    flex-basis: 260px;
   }
 
   .mindGuardCoachPanel {
