@@ -19,6 +19,7 @@ export default function StockGuardPanel({ onSendToChat }) {
   const [candidates, setCandidates] = useState([])
   const [loadingStock, setLoadingStock] = useState(false)
   const [stockError, setStockError] = useState('')
+  const [activeDetail, setActiveDetail] = useState('why')
 
   const debounceTimerRef = useRef(null)
   const lastLoadedNameRef = useRef('')
@@ -36,6 +37,23 @@ export default function StockGuardPanel({ onSendToChat }) {
     const n = Number(value)
     if (!Number.isFinite(n)) return '-'
     return `${Math.round(n).toLocaleString()}원`
+  }
+
+  const formatNumber = (value) => {
+    const n = Number(value)
+    if (!Number.isFinite(n)) return '-'
+    return n.toLocaleString()
+  }
+
+  const formatAmountShort = (value) => {
+    const n = Number(value)
+    if (!Number.isFinite(n)) return '-'
+
+    if (n >= 1000000000000) return `${(n / 1000000000000).toFixed(1)}조`
+    if (n >= 100000000) return `${(n / 100000000).toFixed(1)}억`
+    if (n >= 10000) return `${(n / 10000).toFixed(1)}만`
+
+    return n.toLocaleString()
   }
 
   const formatPercent = (value) => {
@@ -57,6 +75,97 @@ export default function StockGuardPanel({ onSendToChat }) {
     if (form.horizon === '몇 달 이상 들고 갈 생각이에요') return '중장기'
     return '미입력'
   }
+
+  const marketDiagnostics = useMemo(() => {
+    if (!stockData?.summary) {
+      return {
+        volumeRatio: null,
+        latestVolume: null,
+        avgVolume20: null,
+        flags: [],
+        riskLabels: [{ type: 'neutral', title: '데이터 대기', desc: '종목 데이터를 불러오면 위험 라벨이 표시됩니다.' }]
+      }
+    }
+
+    const prices = stockData.prices || []
+    const summary = stockData.summary
+    const current = stockData.current || {}
+
+    const latest = prices[prices.length - 1]
+    const recent20 = prices.slice(-20)
+    const avgVolume20 =
+      recent20.length > 0
+        ? recent20.reduce((sum, row) => sum + Number(row.volume || 0), 0) / recent20.length
+        : 0
+
+    const latestVolume = Number(latest?.volume || current.accumulatedVolume || 0)
+    const volumeRatio = avgVolume20 > 0 ? latestVolume / avgVolume20 : null
+
+    const flags = []
+
+    if (summary.change5d >= 10) flags.push('최근 5거래일 급등')
+    if (summary.change5d <= -8) flags.push('최근 5거래일 급락')
+    if (summary.change20d >= 20) flags.push('최근 20거래일 강한 상승')
+    if (summary.change20d <= -15) flags.push('최근 20거래일 약세')
+    if (summary.drawdownFromHigh > -5) flags.push('90일 고점 근처')
+    if (summary.drawdownFromHigh <= -20) flags.push('고점 대비 큰 하락')
+    if (summary.reboundFromLow >= 30) flags.push('저점 대비 큰 반등')
+    if (volumeRatio !== null && volumeRatio >= 1.8) flags.push('거래량 증가')
+
+    const riskLabels = []
+
+    if (
+      form.action === '더 살까?' &&
+      (summary.change5d >= 10 || summary.change20d >= 20 || summary.drawdownFromHigh > -5) &&
+      ['흥분', '불안', '멘붕'].includes(form.emotion)
+    ) {
+      riskLabels.push({
+        type: 'warning',
+        title: '추격매수 주의',
+        desc: '최근 상승폭이나 고점 근접 상태에서 감정이 앞설 수 있어요.'
+      })
+    }
+
+    if (
+      form.action === '팔까?' &&
+      (summary.change5d <= -8 || summary.change20d <= -15) &&
+      ['불안', '공포', '멘붕', '분노'].includes(form.emotion)
+    ) {
+      riskLabels.push({
+        type: 'danger',
+        title: '패닉셀 주의',
+        desc: '하락폭보다 먼저, 원래 손절 기준에 따른 판단인지 확인해야 해요.'
+      })
+    }
+
+    if (
+      form.action === '더 살까?' &&
+      Number(summary.change20d) <= -10 &&
+      Number(form.averagePrice) > Number(form.currentPrice || summary.currentPrice)
+    ) {
+      riskLabels.push({
+        type: 'danger',
+        title: '손실만회 매수 주의',
+        desc: '평단을 낮추는 효과는 있지만 같은 종목에 묶이는 금액도 커져요.'
+      })
+    }
+
+    if (riskLabels.length === 0) {
+      riskLabels.push({
+        type: 'neutral',
+        title: '기준 재확인',
+        desc: '뚜렷한 위험 라벨은 없지만, 매매 이유와 기준을 먼저 확인하세요.'
+      })
+    }
+
+    return {
+      volumeRatio,
+      latestVolume,
+      avgVolume20,
+      flags,
+      riskLabels
+    }
+  }, [stockData, form.action, form.emotion, form.averagePrice, form.currentPrice])
 
   const analysis = useMemo(() => {
     const avg = toNumber(form.averagePrice)
@@ -112,6 +221,7 @@ export default function StockGuardPanel({ onSendToChat }) {
     return {
       profitRate,
       holdingValue,
+      investedAmount,
       profitAmount,
       stopLossPrice,
       targetPrice,
@@ -157,13 +267,8 @@ export default function StockGuardPanel({ onSendToChat }) {
       setStockData(data)
       lastLoadedNameRef.current = data.stock?.name || trimmed
 
-      if (data.stock?.name) {
-        updateForm('stockName', data.stock.name)
-      }
-
-      if (data.summary?.currentPrice) {
-        updateForm('currentPrice', String(data.summary.currentPrice))
-      }
+      if (data.stock?.name) updateForm('stockName', data.stock.name)
+      if (data.summary?.currentPrice) updateForm('currentPrice', String(data.summary.currentPrice))
     } catch (error) {
       setStockData(null)
       setCandidates([])
@@ -188,9 +293,7 @@ export default function StockGuardPanel({ onSendToChat }) {
     }, 800)
 
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current)
-      }
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
     }
   }, [form.stockName])
 
@@ -216,6 +319,8 @@ export default function StockGuardPanel({ onSendToChat }) {
 - 90일 저점: ${summary.low90d}원
 - 90일 고점 대비 하락률: ${summary.drawdownFromHigh}%
 - 90일 저점 대비 반등률: ${summary.reboundFromLow}%
+- 누적 거래량: ${current?.accumulatedVolume ?? '정보 없음'}
+- 누적 거래대금: ${current?.accumulatedAmount ?? '정보 없음'}
 `.trim()
   }
 
@@ -248,6 +353,7 @@ export default function StockGuardPanel({ onSendToChat }) {
       analysis.addedBuyAmount !== null ? `${Math.round(analysis.addedBuyAmount)}원` : '계산 불가'
     }
 - 판단 힌트: ${analysis.decisionHint}
+- 위험 라벨: ${marketDiagnostics.riskLabels.map((label) => label.title).join(', ')}
 `.trim()
   }
 
@@ -258,7 +364,7 @@ export default function StockGuardPanel({ onSendToChat }) {
 
     const message = `
 너는 Mind-Guard의 금융 심리 케어 챗봇 '숨돌이'야.
-아래 사용자의 투자 상황, 주가 데이터, 앱 계산 결과를 바탕으로 지금 행동이 원칙 매매인지 감정 매매인지 점검해줘.
+아래 사용자의 투자 상황, 주가 데이터, 앱 계산 결과, 위험 라벨을 바탕으로 지금 행동이 원칙 매매인지 감정 매매인지 점검해줘.
 
 [사용자 입력]
 - 종목명: ${form.stockName || '미입력'}
@@ -280,12 +386,13 @@ ${buildDataSummary()}
 ${buildAnalysisSummary()}
 
 [답변 규칙]
-- 600~800자 이내로 답변해.
-- 5~7문장 이하로 답변해.
+- 600~900자 이내로 답변해.
+- 6~8문장 이하로 답변해.
 - 첫 문장은 사용자의 감정을 인정하는 문장으로 시작해.
-- 현재 손익률, 손절 기준 도달 여부, 최근 20거래일 흐름, 고점 대비 하락률, 추가매수 후 평단을 반드시 고려해.
+- 현재 손익률, 손절 기준 도달 여부, 최근 20거래일 흐름, 고점 대비 하락률, 추가매수 후 평단, 위험 라벨을 반드시 고려해.
 - 매수/매도하라고 직접 지시하지 마.
 - 특정 결과를 예측하지 말고, 현재 데이터가 보여주는 위험과 점검 포인트를 설명해.
+- 상승/하락의 원인을 단정하지 말고, 확인해야 할 원인 후보로 표현해.
 - 답변 마지막에는 사용자가 바로 생각할 수 있는 확인 질문 1개만 던져.
 `.trim()
 
@@ -301,7 +408,7 @@ ${buildAnalysisSummary()}
           height: 100%;
           min-height: 0;
           display: grid;
-          grid-template-columns: 340px minmax(0, 1fr);
+          grid-template-columns: 380px minmax(0, 1fr);
           background: #fffaf3;
           border-right: 1px solid rgba(120, 83, 45, 0.12);
         }
@@ -459,22 +566,44 @@ ${buildAnalysisSummary()}
 
         .metricGrid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
           gap: 10px;
         }
 
-        .decisionBox {
-          margin-top: 16px;
-          padding: 16px;
-          border-radius: 18px;
+        .riskGrid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 10px;
+        }
+
+        .detailButtonRow {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 12px;
+        }
+
+        .detailPanel {
+          margin-top: 12px;
+          padding: 14px;
+          border-radius: 16px;
           background: #f8fafc;
           border: 1px solid rgba(148, 163, 184, 0.25);
         }
 
-        .bottomInputRow {
-          display: flex;
-          gap: 10px;
-          align-items: end;
+        .detailPanelTitle {
+          margin: 0 0 8px;
+          font-size: 14px;
+          font-weight: 950;
+          color: #0f172a;
+        }
+
+        .detailList {
+          margin: 0;
+          padding-left: 18px;
+          color: #475569;
+          font-size: 13px;
+          line-height: 1.7;
         }
 
         @media (max-width: 980px) {
@@ -485,15 +614,10 @@ ${buildAnalysisSummary()}
           .mindGuardInputColumn {
             border-right: 0;
             border-bottom: 1px solid rgba(120, 83, 45, 0.12);
-            max-height: none;
           }
 
           .mindGuardMainColumn {
             padding: 16px;
-          }
-
-          .metricGrid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
 
           .dashboardHeader {
@@ -521,15 +645,6 @@ ${buildAnalysisSummary()}
 
           .metricGrid {
             grid-template-columns: 1fr 1fr;
-          }
-
-          .bottomInputRow {
-            display: block;
-          }
-
-          .bottomInputRow button {
-            width: 100%;
-            margin-top: 8px;
           }
         }
       `}</style>
@@ -710,7 +825,7 @@ ${buildAnalysisSummary()}
             <div>
               <h2 className="dashboardTitle">종목 데이터 대시보드</h2>
               <p className="dashboardSubtitle">
-                가격 흐름과 내 기준을 분리해서 보고, 마지막에 숨돌이가 점검합니다.
+                핵심 지표만 먼저 보고, 필요한 근거는 상세 버튼에서 확인해요.
               </p>
             </div>
 
@@ -749,13 +864,35 @@ ${buildAnalysisSummary()}
           {stockData?.summary && (
             <>
               <section className="dashboardSection">
-                <p className="dashboardSectionTitle">시장 데이터</p>
+                <p className="dashboardSectionTitle">핵심 지표</p>
 
                 <div className="metricGrid">
                   <InfoCard label="현재가" value={formatWon(stockData.summary.currentPrice)} />
-                  <InfoCard label="5거래일" value={`${stockData.summary.change5d}%`} />
-                  <InfoCard label="20거래일" value={`${stockData.summary.change20d}%`} />
-                  <InfoCard label="고점 대비" value={`${stockData.summary.drawdownFromHigh}%`} />
+                  <InfoCard
+                    label="5거래일"
+                    value={`${stockData.summary.change5d}%`}
+                    emphasize={stockData.summary.change5d < 0 ? 'bad' : 'good'}
+                  />
+                  <InfoCard
+                    label="20거래일"
+                    value={`${stockData.summary.change20d}%`}
+                    emphasize={stockData.summary.change20d < 0 ? 'bad' : 'good'}
+                  />
+                  <InfoCard
+                    label="고점 대비"
+                    value={`${stockData.summary.drawdownFromHigh}%`}
+                    emphasize={stockData.summary.drawdownFromHigh < -20 ? 'bad' : 'neutral'}
+                  />
+                </div>
+              </section>
+
+              <section className="dashboardSection">
+                <p className="dashboardSectionTitle">위험 라벨</p>
+
+                <div className="riskGrid">
+                  {marketDiagnostics.riskLabels.map((label) => (
+                    <RiskCard key={label.title} {...label} />
+                  ))}
                 </div>
               </section>
 
@@ -768,6 +905,9 @@ ${buildAnalysisSummary()}
 
           <section className="dashboardSection">
             <p className="dashboardSectionTitle">내 손익 계산</p>
+            <p style={{ margin: '-4px 0 12px', fontSize: '13px', color: '#64748b' }}>
+              평균 매수가와 보유 수량을 입력하면 내 손익률, 평가손익, 추가매수 후 평단이 계산됩니다.
+            </p>
 
             <div className="metricGrid">
               <InfoCard
@@ -794,14 +934,39 @@ ${buildAnalysisSummary()}
                 }
               />
             </div>
-
-            <div className="decisionBox">
-              <strong>현재 판단 힌트</strong>
-              <p style={{ margin: '6px 0 0', color: '#475569', fontSize: '14px' }}>
-                {analysis.decisionHint}
-              </p>
-            </div>
           </section>
+
+          {stockData?.summary && (
+            <section className="dashboardSection">
+              <p className="dashboardSectionTitle">상세 확인</p>
+              <div className="detailButtonRow">
+                <DetailButton id="why" active={activeDetail} onClick={setActiveDetail}>
+                  왜 움직였을까?
+                </DetailButton>
+                <DetailButton id="flow" active={activeDetail} onClick={setActiveDetail}>
+                  수급 보기
+                </DetailButton>
+                <DetailButton id="news" active={activeDetail} onClick={setActiveDetail}>
+                  공시·뉴스
+                </DetailButton>
+                <DetailButton id="history" active={activeDetail} onClick={setActiveDetail}>
+                  과거 유사 구간
+                </DetailButton>
+                <DetailButton id="detail" active={activeDetail} onClick={setActiveDetail}>
+                  상세 지표
+                </DetailButton>
+              </div>
+
+              <DetailPanel
+                activeDetail={activeDetail}
+                stockData={stockData}
+                marketDiagnostics={marketDiagnostics}
+                formatWon={formatWon}
+                formatNumber={formatNumber}
+                formatAmountShort={formatAmountShort}
+              />
+            </section>
+          )}
         </main>
       </div>
     </>
@@ -818,6 +983,158 @@ function InfoCard({ label, value, emphasize = 'neutral' }) {
       <div style={{ marginTop: '6px', fontSize: '18px', color, fontWeight: 950 }}>
         {value}
       </div>
+    </div>
+  )
+}
+
+function RiskCard({ type, title, desc }) {
+  const style =
+    type === 'danger'
+      ? riskDangerStyle
+      : type === 'warning'
+        ? riskWarningStyle
+        : riskNeutralStyle
+
+  return (
+    <div style={{ ...riskCardBaseStyle, ...style }}>
+      <strong>{title}</strong>
+      <p style={{ margin: '6px 0 0', fontSize: '13px', lineHeight: 1.5 }}>{desc}</p>
+    </div>
+  )
+}
+
+function DetailButton({ id, active, onClick, children }) {
+  const isActive = active === id
+
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(id)}
+      style={{
+        border: '1px solid rgba(148, 163, 184, 0.35)',
+        borderRadius: '999px',
+        padding: '8px 12px',
+        background: isActive ? '#0f172a' : 'white',
+        color: isActive ? 'white' : '#334155',
+        cursor: 'pointer',
+        fontSize: '13px',
+        fontWeight: 850
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function DetailPanel({
+  activeDetail,
+  stockData,
+  marketDiagnostics,
+  formatWon,
+  formatNumber,
+  formatAmountShort
+}) {
+  const summary = stockData.summary
+  const current = stockData.current || {}
+
+  if (activeDetail === 'why') {
+    return (
+      <div className="detailPanel">
+        <p className="detailPanelTitle">왜 움직였을까? — 원인 후보 체크</p>
+        <ul className="detailList">
+          <li>최근 5거래일 변화율은 {summary.change5d}%입니다.</li>
+          <li>최근 20거래일 변화율은 {summary.change20d}%입니다.</li>
+          <li>90일 고점 대비 {summary.drawdownFromHigh}% 위치에 있습니다.</li>
+          <li>90일 저점 대비 {summary.reboundFromLow}% 반등한 상태입니다.</li>
+          <li>
+            거래량은 최근 20거래일 평균 대비{' '}
+            {marketDiagnostics.volumeRatio
+              ? `${marketDiagnostics.volumeRatio.toFixed(2)}배`
+              : '계산 대기'}{' '}
+            수준입니다.
+          </li>
+          <li>
+            감지된 가격·거래량 신호:{' '}
+            {marketDiagnostics.flags.length > 0
+              ? marketDiagnostics.flags.join(', ')
+              : '뚜렷한 급등·급락 신호 없음'}
+          </li>
+        </ul>
+        <p style={safeNoticeStyle}>
+          상승·하락의 확정 원인이 아니라, 매매 전 확인해야 할 가능성 있는 요인입니다.
+        </p>
+      </div>
+    )
+  }
+
+  if (activeDetail === 'flow') {
+    return (
+      <div className="detailPanel">
+        <p className="detailPanelTitle">수급 보기 — 다음 고도화 예정</p>
+        <ul className="detailList">
+          <li>개인 순매수/순매도</li>
+          <li>외국인 순매수/순매도</li>
+          <li>기관 순매수/순매도</li>
+          <li>프로그램 매매</li>
+          <li>신용잔고와 공매도 추이</li>
+        </ul>
+        <p style={safeNoticeStyle}>
+          현재 버전에서는 가격·거래량 중심으로 먼저 점검하고, 수급 데이터는 추후 API로 연결할 예정입니다.
+        </p>
+      </div>
+    )
+  }
+
+  if (activeDetail === 'news') {
+    return (
+      <div className="detailPanel">
+        <p className="detailPanelTitle">공시·뉴스 — 다음 고도화 예정</p>
+        <ul className="detailList">
+          <li>실적 발표</li>
+          <li>공급계약</li>
+          <li>유상증자·무상증자</li>
+          <li>전환사채·신주인수권부사채</li>
+          <li>최대주주 변경</li>
+          <li>소송·제재·투자경고 여부</li>
+        </ul>
+        <p style={safeNoticeStyle}>
+          가격 변동의 원인을 단정하지 않고, 함께 확인할 이벤트 후보로 표시하는 방향이 안전합니다.
+        </p>
+      </div>
+    )
+  }
+
+  if (activeDetail === 'history') {
+    return (
+      <div className="detailPanel">
+        <p className="detailPanelTitle">과거 유사 구간 — 다음 고도화 예정</p>
+        <ul className="detailList">
+          <li>90일 고점 대비 -20% 이상 하락했던 과거 구간</li>
+          <li>이후 20거래일 평균 흐름</li>
+          <li>이후 60거래일 평균 흐름</li>
+          <li>반등 사례, 횡보 사례, 추가 하락 사례를 함께 표시</li>
+        </ul>
+        <p style={safeNoticeStyle}>
+          반등 확률처럼 보이게 만들지 않고, 예측이 아닌 과거 참고 분포로만 제공하는 것이 좋습니다.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="detailPanel">
+      <p className="detailPanelTitle">상세 지표</p>
+      <ul className="detailList">
+        <li>현재가: {formatWon(summary.currentPrice)}</li>
+        <li>전일 등락률: {current.previousDayRate ?? '-'}%</li>
+        <li>전일 대비: {formatWon(current.previousDayDiff)}</li>
+        <li>90일 고점: {formatWon(summary.high90d)}</li>
+        <li>90일 저점: {formatWon(summary.low90d)}</li>
+        <li>고점 대비: {summary.drawdownFromHigh}%</li>
+        <li>저점 대비: {summary.reboundFromLow}%</li>
+        <li>누적 거래량: {formatNumber(current.accumulatedVolume)}</li>
+        <li>누적 거래대금: {formatAmountShort(current.accumulatedAmount)}</li>
+      </ul>
     </div>
   )
 }
@@ -963,4 +1280,39 @@ const errorStyle = {
   color: '#b91c1c',
   fontSize: '13px',
   fontWeight: 800
+}
+
+const riskCardBaseStyle = {
+  borderRadius: '16px',
+  padding: '14px',
+  fontSize: '13px',
+  border: '1px solid transparent'
+}
+
+const riskDangerStyle = {
+  background: '#fef2f2',
+  color: '#991b1b',
+  borderColor: 'rgba(220, 38, 38, 0.22)'
+}
+
+const riskWarningStyle = {
+  background: '#fffbeb',
+  color: '#92400e',
+  borderColor: 'rgba(245, 158, 11, 0.28)'
+}
+
+const riskNeutralStyle = {
+  background: '#f8fafc',
+  color: '#334155',
+  borderColor: 'rgba(148, 163, 184, 0.25)'
+}
+
+const safeNoticeStyle = {
+  margin: '10px 0 0',
+  padding: '10px 12px',
+  borderRadius: '12px',
+  background: '#fff7ed',
+  color: '#9a3412',
+  fontSize: '12px',
+  lineHeight: 1.5
 }
