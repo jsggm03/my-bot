@@ -1,7 +1,5 @@
 const STOCK_LIST = [
-  // ─────────────────────────────
   // KOSPI 대형주 / 대표주
-  // ─────────────────────────────
   { name: '삼성전자', code: '005930', market: 'KOSPI', aliases: ['삼전'] },
   { name: '삼성전자우', code: '005935', market: 'KOSPI', aliases: ['삼전우'] },
   { name: 'SK하이닉스', code: '000660', market: 'KOSPI', aliases: ['하이닉스', 'sk하이닉스'] },
@@ -98,9 +96,7 @@ const STOCK_LIST = [
   { name: '코스맥스', code: '192820', market: 'KOSPI' },
   { name: '한국콜마', code: '161890', market: 'KOSPI' },
 
-  // ─────────────────────────────
   // KOSDAQ / 성장주 / 2차전지 / 바이오 / 게임
-  // ─────────────────────────────
   { name: '에코프로비엠', code: '247540', market: 'KOSDAQ' },
   { name: '에코프로', code: '086520', market: 'KOSDAQ' },
   { name: '엘앤에프', code: '066970', market: 'KOSDAQ' },
@@ -114,7 +110,6 @@ const STOCK_LIST = [
   { name: '메디톡스', code: '086900', market: 'KOSDAQ' },
   { name: '오스코텍', code: '039200', market: 'KOSDAQ' },
   { name: '셀트리온제약', code: '068760', market: 'KOSDAQ' },
-  { name: '셀트리온헬스케어', code: '091990', market: 'KOSDAQ' },
   { name: '펄어비스', code: '263750', market: 'KOSDAQ' },
   { name: '카카오게임즈', code: '293490', market: 'KOSDAQ' },
   { name: '위메이드', code: '112040', market: 'KOSDAQ' },
@@ -147,7 +142,6 @@ const STOCK_LIST = [
   { name: '클래시스', code: '214150', market: 'KOSDAQ' },
   { name: '파마리서치', code: '214450', market: 'KOSDAQ' },
   { name: '케어젠', code: '214370', market: 'KOSDAQ' },
-  { name: '코어라인소프트', code: '384470', market: 'KOSDAQ' },
   { name: '신성델타테크', code: '065350', market: 'KOSDAQ' },
   { name: '서진시스템', code: '178320', market: 'KOSDAQ' }
 ]
@@ -163,21 +157,37 @@ function normalizeText(value) {
     .replace(/[().·_\-]/g, '')
 }
 
-function findStockByName(name) {
+function getSearchNames(stock) {
+  return [stock.name, stock.code, ...(stock.aliases || [])].map(normalizeText)
+}
+
+function searchStock(name) {
   const keyword = normalizeText(name)
-  if (!keyword) return null
+  if (!keyword) return { type: 'none', candidates: [] }
 
-  const exact = STOCK_LIST.find((stock) => {
-    const names = [stock.name, stock.code, ...(stock.aliases || [])].map(normalizeText)
-    return names.includes(keyword)
-  })
+  const exactMatches = STOCK_LIST.filter((stock) => getSearchNames(stock).includes(keyword))
 
-  if (exact) return exact
+  if (exactMatches.length === 1) {
+    return { type: 'exact', stock: exactMatches[0], candidates: [] }
+  }
 
-  return STOCK_LIST.find((stock) => {
-    const names = [stock.name, ...(stock.aliases || [])].map(normalizeText)
-    return names.some((n) => n.includes(keyword) || keyword.includes(n))
-  })
+  if (exactMatches.length > 1) {
+    return { type: 'ambiguous', candidates: exactMatches.slice(0, 12) }
+  }
+
+  const partialMatches = STOCK_LIST.filter((stock) =>
+    getSearchNames(stock).some((n) => n.includes(keyword) || keyword.includes(n))
+  )
+
+  if (partialMatches.length === 1) {
+    return { type: 'exact', stock: partialMatches[0], candidates: [] }
+  }
+
+  if (partialMatches.length > 1) {
+    return { type: 'ambiguous', candidates: partialMatches.slice(0, 12) }
+  }
+
+  return { type: 'none', candidates: [] }
 }
 
 function formatDate(date) {
@@ -382,7 +392,22 @@ export default async function handler(req, res) {
 
   try {
     const name = String(req.query?.name || '')
-    const stock = findStockByName(name)
+    const searchResult = searchStock(name)
+
+    if (searchResult.type === 'ambiguous') {
+      return res.status(200).json({
+        success: false,
+        error: 'ambiguous_stock',
+        message: '여러 종목이 검색되었습니다. 원하는 종목을 선택해 주세요.',
+        candidates: searchResult.candidates.map((stock) => ({
+          name: stock.name,
+          code: stock.code,
+          market: stock.market
+        }))
+      })
+    }
+
+    const stock = searchResult.stock
 
     if (!stock) {
       return res.status(404).json({
