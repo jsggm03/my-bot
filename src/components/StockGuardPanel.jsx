@@ -301,7 +301,7 @@ ${buildAnalysisSummary()}
           height: 100%;
           min-height: 0;
           display: grid;
-          grid-template-columns: 280px minmax(0, 1fr);
+          grid-template-columns: 340px minmax(0, 1fr);
           background: #fffaf3;
           border-right: 1px solid rgba(120, 83, 45, 0.12);
         }
@@ -309,7 +309,7 @@ ${buildAnalysisSummary()}
         .mindGuardInputColumn {
           min-height: 0;
           overflow-y: auto;
-          padding: 20px 16px;
+          padding: 24px 22px;
           border-right: 1px solid rgba(120, 83, 45, 0.12);
           background: #fff9ef;
         }
@@ -317,7 +317,7 @@ ${buildAnalysisSummary()}
         .mindGuardMainColumn {
           min-height: 0;
           overflow-y: auto;
-          padding: 24px;
+          padding: 30px;
           background: #fffdf8;
         }
 
@@ -459,7 +459,7 @@ ${buildAnalysisSummary()}
 
         .metricGrid {
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
           gap: 10px;
         }
 
