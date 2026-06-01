@@ -786,52 +786,60 @@ export default function App() {
   const isChatConnected = status !== 'idle' && status !== 'connecting'
 
   return (
-    <div className={styles.mindGuardApp}>
-      <StockGuardPanel onSendToChat={sendMessage} />
+  <div className={styles.mindGuardApp}>
+    <StockGuardPanel onSendToChat={sendMessage} />
 
-      <aside className={styles.mindGuardCoachPanel}>
-        <div className={styles.mindGuardAvatarSlot}>
-          <AvatarPanel
-            status={status}
-            mode={conversationMode}
-            onModeChange={changeConversationMode}
-            vrmAvatarRef={vrmAvatarRef}
-            onAvatarReady={handleAvatarReady}
-            userVideoRef={userVideoRef}
-            videoReady={videoReady}
-            cameraActive={Boolean(cameraStream)}
-            onStart={startConversation}
-            onStop={stopAvatar}
-            onInterrupt={interruptAvatar}
-            isListening={isListening}
-          />
-        </div>
+    <aside
+      className={`${styles.mindGuardCoachPanel} ${
+        conversationMode === 'ttt'
+          ? styles.coachTextMode
+          : conversationMode === 'sts'
+            ? styles.coachVoiceMode
+            : styles.coachAvatarMode
+      }`}
+    >
+      <div className={styles.mindGuardAvatarSlot}>
+        <AvatarPanel
+          status={status}
+          mode={conversationMode}
+          onModeChange={changeConversationMode}
+          vrmAvatarRef={vrmAvatarRef}
+          onAvatarReady={handleAvatarReady}
+          userVideoRef={userVideoRef}
+          videoReady={videoReady}
+          cameraActive={Boolean(cameraStream)}
+          onStart={startConversation}
+          onStop={stopAvatar}
+          onInterrupt={interruptAvatar}
+          isListening={isListening}
+        />
+      </div>
 
-        <div className={styles.mindGuardChatSlot}>
-          <ChatPanel
-            messages={messages}
-            isProcessing={isProcessing}
-            onSend={sendMessage}
-            connected={isChatConnected}
-            isListening={isListening}
-            onToggleMic={toggleMic}
-            micEnabled={conversationMode !== 'ttt' && isChatConnected}
-            micAvailable={conversationMode !== 'ttt'}
-            mode={conversationMode}
-            user={user}
-            onLoginClick={() => setAuthOpen(true)}
-            onLogout={handleLogout}
-            theme={theme}
-            onToggleTheme={toggleTheme}
-          />
-        </div>
-      </aside>
+      <div className={styles.mindGuardChatSlot}>
+        <ChatPanel
+          messages={messages}
+          isProcessing={isProcessing}
+          onSend={sendMessage}
+          connected={isChatConnected}
+          isListening={isListening}
+          onToggleMic={toggleMic}
+          micEnabled={conversationMode !== 'ttt' && isChatConnected}
+          micAvailable={conversationMode !== 'ttt'}
+          mode={conversationMode}
+          user={user}
+          onLoginClick={() => setAuthOpen(true)}
+          onLogout={handleLogout}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      </div>
+    </aside>
 
-      <AuthModal
-        open={authOpen}
-        onClose={() => setAuthOpen(false)}
-        onSuccess={(u) => setUser(u)}
-      />
-    </div>
-  )
+    <AuthModal
+      open={authOpen}
+      onClose={() => setAuthOpen(false)}
+      onSuccess={(u) => setUser(u)}
+    />
+  </div>
+)
 }
