@@ -670,6 +670,45 @@ if (sessionIdRef.current) {
     <StockGuardPanel onSendToChat={sendMessage} />
 
     <aside className={styles.mindGuardCoachPanel}>
+      <div className={styles.mindGuardCoachTop}>
+        <div>
+          <strong>숨돌이 코치</strong>
+          <p>데이터를 보고, 마지막 판단을 같이 점검해요</p>
+        </div>
+
+        <div className={styles.coachModeTabs}>
+          <button
+            type="button"
+            onClick={() => changeConversationMode('ttt')}
+            className={`${styles.coachModeButton} ${
+              conversationMode === 'ttt' ? styles.coachModeButtonActive : ''
+            }`}
+          >
+            💬 텍스트
+          </button>
+
+          <button
+            type="button"
+            onClick={() => changeConversationMode('sts')}
+            className={`${styles.coachModeButton} ${
+              conversationMode === 'sts' ? styles.coachModeButtonActive : ''
+            }`}
+          >
+            🎙️ 음성
+          </button>
+
+          <button
+            type="button"
+            onClick={() => changeConversationMode('ftf')}
+            className={`${styles.coachModeButton} ${
+              conversationMode === 'ftf' ? styles.coachModeButtonActive : ''
+            }`}
+          >
+            🧑‍💻 아바타
+          </button>
+        </div>
+      </div>
+
       <div className={styles.mindGuardAvatarSlot}>
         <AvatarPanel
           status={status}
