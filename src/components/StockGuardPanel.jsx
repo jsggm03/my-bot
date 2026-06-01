@@ -295,204 +295,541 @@ ${buildAnalysisSummary()}
   }
 
   return (
-    <section style={panelStyle}>
-      <div style={topRowStyle}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: '18px' }}>🌬️ 숨돌이 투자 점검</h2>
-          <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#64748b' }}>
-            종목 데이터와 내 투자 기준을 함께 확인해요.
-          </p>
-        </div>
-        <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700 }}>
-          {loadingStock ? '종목 조회 중...' : stockData ? '데이터 연결됨' : '종목명 입력 시 자동 조회'}
-        </div>
-      </div>
+    <>
+      <style>{`
+        .mindGuardWorkspace {
+          height: 100%;
+          min-height: 0;
+          display: grid;
+          grid-template-columns: 280px minmax(0, 1fr);
+          background: #fffaf3;
+          border-right: 1px solid rgba(120, 83, 45, 0.12);
+        }
 
-      <div style={gridStyle}>
-        <label style={labelStyle}>
-          종목명
-          <input
-            value={form.stockName}
-            onChange={(e) => updateForm('stockName', e.target.value)}
-            placeholder="예: 카카오, 삼성전자"
-            style={inputStyle}
-          />
-        </label>
+        .mindGuardInputColumn {
+          min-height: 0;
+          overflow-y: auto;
+          padding: 20px 16px;
+          border-right: 1px solid rgba(120, 83, 45, 0.12);
+          background: #fff9ef;
+        }
 
-        <label style={labelStyle}>
-          평균 매수가
-          <input
-            type="number"
-            value={form.averagePrice}
-            onChange={(e) => updateForm('averagePrice', e.target.value)}
-            placeholder="예: 50000"
-            style={inputStyle}
-          />
-        </label>
+        .mindGuardMainColumn {
+          min-height: 0;
+          overflow-y: auto;
+          padding: 24px;
+          background: #fffdf8;
+        }
 
-        <label style={labelStyle}>
-          보유 수량(주)
-          <input
-            type="number"
-            value={form.quantity}
-            onChange={(e) => updateForm('quantity', e.target.value)}
-            placeholder="예: 100"
-            style={inputStyle}
-          />
-        </label>
+        .brandTitle {
+          font-size: 22px;
+          font-weight: 900;
+          color: #3b2a1c;
+          margin: 0;
+        }
 
-        <label style={labelStyle}>
-          매매 희망 수량(주)
-          <input
-            type="number"
-            value={form.tradeQuantity}
-            onChange={(e) => updateForm('tradeQuantity', e.target.value)}
-            placeholder="예: 50"
-            style={inputStyle}
-          />
-        </label>
+        .brandSubtitle {
+          font-size: 13px;
+          color: #8a6a4a;
+          margin: 6px 0 18px;
+        }
 
-        <label style={labelStyle}>
-          지금 고민
-          <select value={form.action} onChange={(e) => updateForm('action', e.target.value)} style={inputStyle}>
-            <option>더 살까?</option>
-            <option>팔까?</option>
-            <option>기다릴까?</option>
-          </select>
-        </label>
+        .sideSection {
+          margin-top: 18px;
+          padding-top: 16px;
+          border-top: 1px solid rgba(120, 83, 45, 0.12);
+        }
 
-        <label style={labelStyle}>
-          투자 기간
-          <select value={form.horizon} onChange={(e) => updateForm('horizon', e.target.value)} style={inputStyle}>
-            <option>오늘 안에 결정하고 싶어요</option>
-            <option>며칠~몇 주 보고 있어요</option>
-            <option>몇 달 이상 들고 갈 생각이에요</option>
-          </select>
-        </label>
+        .sideSectionTitle {
+          margin: 0 0 10px;
+          font-size: 13px;
+          font-weight: 900;
+          color: #5b3d25;
+        }
 
-        <label style={labelStyle}>
-          현재 감정
-          <select value={form.emotion} onChange={(e) => updateForm('emotion', e.target.value)} style={inputStyle}>
-            <option>불안</option>
-            <option>분노</option>
-            <option>공포</option>
-            <option>흥분</option>
-            <option>차분</option>
-            <option>멘붕</option>
-          </select>
-        </label>
+        .inputStack {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
 
-        <label style={labelStyle}>
-          손절 기준(%)
-          <input
-            type="number"
-            value={form.stopLossRate}
-            onChange={(e) => updateForm('stopLossRate', e.target.value)}
-            placeholder="예: -10"
-            style={inputStyle}
-          />
-        </label>
+        .pillRow {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
 
-        <label style={labelStyle}>
-          목표 수익률(%)
-          <input
-            type="number"
-            value={form.targetRate}
-            onChange={(e) => updateForm('targetRate', e.target.value)}
-            placeholder="예: 15"
-            style={inputStyle}
-          />
-        </label>
-      </div>
+        .candidateBox {
+          margin-top: 12px;
+          padding: 12px;
+          border-radius: 14px;
+          background: #fffbeb;
+          border: 1px solid rgba(245, 158, 11, 0.3);
+          color: #78350f;
+          font-size: 13px;
+        }
 
-      {candidates.length > 0 && (
-        <div style={candidateBoxStyle}>
-          <strong>어떤 종목을 말하나요?</strong>
-          <div style={candidateListStyle}>
-            {candidates.map((candidate) => (
-              <button
-                key={candidate.code}
-                type="button"
-                onClick={() => handleCandidateClick(candidate)}
-                style={candidateButtonStyle}
-              >
-                {candidate.name} <span>{candidate.code}</span>
+        .candidateTitle {
+          font-weight: 900;
+          margin-bottom: 8px;
+        }
+
+        .dashboardHeader {
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          align-items: flex-start;
+          margin-bottom: 18px;
+        }
+
+        .dashboardTitle {
+          margin: 0;
+          font-size: 26px;
+          font-weight: 950;
+          color: #1f2937;
+        }
+
+        .dashboardSubtitle {
+          margin: 6px 0 0;
+          font-size: 14px;
+          color: #64748b;
+        }
+
+        .statusBadge {
+          border-radius: 999px;
+          padding: 8px 12px;
+          font-size: 12px;
+          font-weight: 900;
+          background: #fff7ed;
+          color: #9a3412;
+          border: 1px solid rgba(251, 146, 60, 0.25);
+          white-space: nowrap;
+        }
+
+        .emptyState {
+          height: 100%;
+          min-height: 420px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          color: #8a6a4a;
+        }
+
+        .emptyIcon {
+          font-size: 42px;
+          margin-bottom: 12px;
+        }
+
+        .stockIdentity {
+          padding: 16px;
+          border-radius: 18px;
+          background: linear-gradient(135deg, #0f172a, #334155);
+          color: white;
+          box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+        }
+
+        .stockIdentityName {
+          font-size: 24px;
+          font-weight: 950;
+          margin: 0;
+        }
+
+        .stockIdentityCode {
+          margin-top: 6px;
+          font-size: 13px;
+          color: rgba(255,255,255,0.72);
+        }
+
+        .dashboardSection {
+          margin-top: 16px;
+          padding: 16px;
+          border-radius: 18px;
+          background: white;
+          border: 1px solid rgba(148, 163, 184, 0.22);
+          box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
+        }
+
+        .dashboardSectionTitle {
+          margin: 0 0 12px;
+          font-size: 15px;
+          font-weight: 950;
+          color: #0f172a;
+        }
+
+        .metricGrid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .decisionBox {
+          margin-top: 16px;
+          padding: 16px;
+          border-radius: 18px;
+          background: #f8fafc;
+          border: 1px solid rgba(148, 163, 184, 0.25);
+        }
+
+        .bottomInputRow {
+          display: flex;
+          gap: 10px;
+          align-items: end;
+        }
+
+        @media (max-width: 980px) {
+          .mindGuardWorkspace {
+            grid-template-columns: 1fr;
+          }
+
+          .mindGuardInputColumn {
+            border-right: 0;
+            border-bottom: 1px solid rgba(120, 83, 45, 0.12);
+            max-height: none;
+          }
+
+          .mindGuardMainColumn {
+            padding: 16px;
+          }
+
+          .metricGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .dashboardHeader {
+            display: block;
+          }
+
+          .statusBadge {
+            display: inline-block;
+            margin-top: 10px;
+          }
+        }
+
+        @media (max-width: 560px) {
+          .mindGuardInputColumn {
+            padding: 14px;
+          }
+
+          .brandTitle {
+            font-size: 19px;
+          }
+
+          .dashboardTitle {
+            font-size: 21px;
+          }
+
+          .metricGrid {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .bottomInputRow {
+            display: block;
+          }
+
+          .bottomInputRow button {
+            width: 100%;
+            margin-top: 8px;
+          }
+        }
+      `}</style>
+
+      <div className="mindGuardWorkspace">
+        <aside className="mindGuardInputColumn">
+          <h1 className="brandTitle">마인드 가드</h1>
+          <p className="brandSubtitle">주식창 앞에서 흔들릴 때, 먼저 기준을 확인해요</p>
+
+          <div className="sideSection">
+            <p className="sideSectionTitle">1. 종목 입력</p>
+
+            <div className="inputStack">
+              <label style={labelStyle}>
+                종목명
+                <input
+                  value={form.stockName}
+                  onChange={(e) => updateForm('stockName', e.target.value)}
+                  placeholder="예: 카카오, 삼성전자"
+                  style={inputStyle}
+                />
+              </label>
+            </div>
+
+            {candidates.length > 0 && (
+              <div className="candidateBox">
+                <div className="candidateTitle">어떤 종목을 말하나요?</div>
+                <div className="pillRow">
+                  {candidates.map((candidate) => (
+                    <button
+                      key={candidate.code}
+                      type="button"
+                      onClick={() => handleCandidateClick(candidate)}
+                      style={candidateButtonStyle}
+                    >
+                      {candidate.name} <span>{candidate.code}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {stockError && <p style={errorStyle}>{stockError}</p>}
+          </div>
+
+          <div className="sideSection">
+            <p className="sideSectionTitle">2. 내 투자 기준</p>
+
+            <div className="inputStack">
+              <label style={labelStyle}>
+                평균 매수가
+                <input
+                  type="number"
+                  value={form.averagePrice}
+                  onChange={(e) => updateForm('averagePrice', e.target.value)}
+                  placeholder="예: 50000"
+                  style={inputStyle}
+                />
+              </label>
+
+              <label style={labelStyle}>
+                보유 수량(주)
+                <input
+                  type="number"
+                  value={form.quantity}
+                  onChange={(e) => updateForm('quantity', e.target.value)}
+                  placeholder="예: 100"
+                  style={inputStyle}
+                />
+              </label>
+
+              <label style={labelStyle}>
+                매매 희망 수량(주)
+                <input
+                  type="number"
+                  value={form.tradeQuantity}
+                  onChange={(e) => updateForm('tradeQuantity', e.target.value)}
+                  placeholder="예: 50"
+                  style={inputStyle}
+                />
+              </label>
+
+              <label style={labelStyle}>
+                지금 고민
+                <select
+                  value={form.action}
+                  onChange={(e) => updateForm('action', e.target.value)}
+                  style={inputStyle}
+                >
+                  <option>더 살까?</option>
+                  <option>팔까?</option>
+                  <option>기다릴까?</option>
+                </select>
+              </label>
+
+              <label style={labelStyle}>
+                투자 기간
+                <select
+                  value={form.horizon}
+                  onChange={(e) => updateForm('horizon', e.target.value)}
+                  style={inputStyle}
+                >
+                  <option>오늘 안에 결정하고 싶어요</option>
+                  <option>며칠~몇 주 보고 있어요</option>
+                  <option>몇 달 이상 들고 갈 생각이에요</option>
+                </select>
+              </label>
+
+              <label style={labelStyle}>
+                현재 감정
+                <select
+                  value={form.emotion}
+                  onChange={(e) => updateForm('emotion', e.target.value)}
+                  style={inputStyle}
+                >
+                  <option>불안</option>
+                  <option>분노</option>
+                  <option>공포</option>
+                  <option>흥분</option>
+                  <option>차분</option>
+                  <option>멘붕</option>
+                </select>
+              </label>
+
+              <label style={labelStyle}>
+                손절 기준(%)
+                <input
+                  type="number"
+                  value={form.stopLossRate}
+                  onChange={(e) => updateForm('stopLossRate', e.target.value)}
+                  placeholder="예: -10"
+                  style={inputStyle}
+                />
+              </label>
+
+              <label style={labelStyle}>
+                목표 수익률(%)
+                <input
+                  type="number"
+                  value={form.targetRate}
+                  onChange={(e) => updateForm('targetRate', e.target.value)}
+                  placeholder="예: 15"
+                  style={inputStyle}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="sideSection">
+            <p className="sideSectionTitle">3. 숨돌이에게 물어보기</p>
+
+            <div className="inputStack">
+              <label style={labelStyle}>
+                지금 고민 한 줄
+                <input
+                  value={form.memo}
+                  onChange={(e) => updateForm('memo', e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                      e.preventDefault()
+                      handleSubmit()
+                    }
+                  }}
+                  placeholder="예: 결과가 이래서 불안해요."
+                  style={inputStyle}
+                />
+              </label>
+
+              <button type="button" onClick={handleSubmit} style={primaryButtonStyle}>
+                점검받기
               </button>
-            ))}
+            </div>
           </div>
-        </div>
-      )}
+        </aside>
 
-      {stockError && <p style={errorStyle}>{stockError}</p>}
+        <main className="mindGuardMainColumn">
+          <div className="dashboardHeader">
+            <div>
+              <h2 className="dashboardTitle">종목 데이터 대시보드</h2>
+              <p className="dashboardSubtitle">
+                가격 흐름과 내 기준을 분리해서 보고, 마지막에 숨돌이가 점검합니다.
+              </p>
+            </div>
 
-      {stockData?.stock && (
-        <div style={selectedStockStyle}>
-          조회 종목: <strong>{stockData.stock.name}</strong> {stockData.stock.code} · {stockData.stock.market}
-        </div>
-      )}
-
-      {stockData?.summary && (
-        <>
-          <div style={cardGridStyle}>
-            <InfoCard label="현재가" value={formatWon(stockData.summary.currentPrice)} />
-            <InfoCard label="5거래일" value={`${stockData.summary.change5d}%`} />
-            <InfoCard label="20거래일" value={`${stockData.summary.change20d}%`} />
-            <InfoCard label="고점 대비" value={`${stockData.summary.drawdownFromHigh}%`} />
+            <div className="statusBadge">
+              {loadingStock
+                ? '종목 조회 중...'
+                : stockData
+                  ? '데이터 연결됨'
+                  : '종목명 입력 시 자동 조회'}
+            </div>
           </div>
-          <MiniPriceChart prices={stockData.prices || []} stock={stockData.stock} />
-        </>
-      )}
 
-      <div style={cardGridStyle}>
-        <InfoCard label="현재 손익률" value={analysis.profitRate !== null ? formatPercent(analysis.profitRate) : '-'} emphasize={analysis.profitRate < 0 ? 'bad' : 'good'} />
-        <InfoCard label="평가손익" value={analysis.profitAmount !== null ? formatWon(analysis.profitAmount) : '-'} emphasize={analysis.profitAmount < 0 ? 'bad' : 'good'} />
-        <InfoCard label="손절 기준" value={analysis.stopLossReached ? '도달' : '미도달'} emphasize={analysis.stopLossReached ? 'bad' : 'neutral'} />
-        <InfoCard label="추가매수 후 평단" value={analysis.newAverageAfterBuy !== null ? formatWon(analysis.newAverageAfterBuy) : '-'} />
+          {!stockData?.summary && (
+            <div className="emptyState">
+              <div>
+                <div className="emptyIcon">📊</div>
+                <h3 style={{ margin: 0, fontSize: '20px', color: '#3b2a1c' }}>
+                  종목을 입력해 주세요
+                </h3>
+                <p style={{ marginTop: '8px', fontSize: '14px' }}>
+                  왼쪽에서 종목명을 입력하면 현재가와 최근 흐름이 자동으로 표시됩니다.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {stockData?.stock && (
+            <div className="stockIdentity">
+              <p className="stockIdentityName">{stockData.stock.name}</p>
+              <div className="stockIdentityCode">
+                종목코드 {stockData.stock.code} · {stockData.stock.market}
+              </div>
+            </div>
+          )}
+
+          {stockData?.summary && (
+            <>
+              <section className="dashboardSection">
+                <p className="dashboardSectionTitle">시장 데이터</p>
+
+                <div className="metricGrid">
+                  <InfoCard label="현재가" value={formatWon(stockData.summary.currentPrice)} />
+                  <InfoCard label="5거래일" value={`${stockData.summary.change5d}%`} />
+                  <InfoCard label="20거래일" value={`${stockData.summary.change20d}%`} />
+                  <InfoCard label="고점 대비" value={`${stockData.summary.drawdownFromHigh}%`} />
+                </div>
+              </section>
+
+              <section className="dashboardSection">
+                <p className="dashboardSectionTitle">최근 흐름</p>
+                <MiniPriceChart prices={stockData.prices || []} stock={stockData.stock} />
+              </section>
+            </>
+          )}
+
+          <section className="dashboardSection">
+            <p className="dashboardSectionTitle">내 손익 계산</p>
+
+            <div className="metricGrid">
+              <InfoCard
+                label="현재 손익률"
+                value={analysis.profitRate !== null ? formatPercent(analysis.profitRate) : '-'}
+                emphasize={analysis.profitRate < 0 ? 'bad' : 'good'}
+              />
+              <InfoCard
+                label="평가손익"
+                value={analysis.profitAmount !== null ? formatWon(analysis.profitAmount) : '-'}
+                emphasize={analysis.profitAmount < 0 ? 'bad' : 'good'}
+              />
+              <InfoCard
+                label="손절 기준"
+                value={analysis.stopLossReached ? '도달' : '미도달'}
+                emphasize={analysis.stopLossReached ? 'bad' : 'neutral'}
+              />
+              <InfoCard
+                label="추가매수 후 평단"
+                value={
+                  analysis.newAverageAfterBuy !== null
+                    ? formatWon(analysis.newAverageAfterBuy)
+                    : '-'
+                }
+              />
+            </div>
+
+            <div className="decisionBox">
+              <strong>현재 판단 힌트</strong>
+              <p style={{ margin: '6px 0 0', color: '#475569', fontSize: '14px' }}>
+                {analysis.decisionHint}
+              </p>
+            </div>
+          </section>
+        </main>
       </div>
-
-      <div style={bottomInputRowStyle}>
-        <label style={{ ...labelStyle, flex: 1 }}>
-          지금 고민 한 줄
-          <input
-            value={form.memo}
-            onChange={(e) => updateForm('memo', e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                e.preventDefault()
-                handleSubmit()
-              }
-            }}
-            placeholder="예: 5년 들고 있었는데 결과가 이거라 불안해요."
-            style={inputStyle}
-          />
-        </label>
-
-        <button type="button" onClick={handleSubmit} style={primaryButtonStyle}>
-          점검받기
-        </button>
-      </div>
-    </section>
+    </>
   )
 }
 
 function InfoCard({ label, value, emphasize = 'neutral' }) {
-  const color = emphasize === 'bad' ? '#dc2626' : emphasize === 'good' ? '#047857' : '#0f172a'
+  const color =
+    emphasize === 'bad' ? '#dc2626' : emphasize === 'good' ? '#047857' : '#0f172a'
 
   return (
     <div style={infoCardStyle}>
-      <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>{label}</div>
-      <div style={{ marginTop: '4px', fontSize: '15px', color, fontWeight: 800 }}>{value}</div>
+      <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 800 }}>{label}</div>
+      <div style={{ marginTop: '6px', fontSize: '18px', color, fontWeight: 950 }}>
+        {value}
+      </div>
     </div>
   )
 }
 
 function MiniPriceChart({ prices, stock }) {
   const chartPrices = prices.slice(-60)
+
   if (!chartPrices.length) return null
 
-  const width = 520
-  const height = 120
-  const padding = 12
+  const width = 720
+  const height = 180
+  const padding = 18
   const closes = chartPrices.map((p) => p.close)
   const min = Math.min(...closes)
   const max = Math.max(...closes)
@@ -500,8 +837,13 @@ function MiniPriceChart({ prices, stock }) {
 
   const points = chartPrices
     .map((p, index) => {
-      const x = padding + (index / Math.max(chartPrices.length - 1, 1)) * (width - padding * 2)
-      const y = padding + ((max - p.close) / range) * (height - padding * 2)
+      const x =
+        padding +
+        (index / Math.max(chartPrices.length - 1, 1)) * (width - padding * 2)
+      const y =
+        padding +
+        ((max - p.close) / range) * (height - padding * 2)
+
       return `${x},${y}`
     })
     .join(' ')
@@ -513,13 +855,22 @@ function MiniPriceChart({ prices, stock }) {
     <div style={chartBoxStyle}>
       <div style={chartHeaderStyle}>
         <strong>
-          {stock?.name} {stock?.code} · 최근 60거래일
+          {stock?.name} {stock?.code} · 최근 60거래일 종가
         </strong>
-        <span>{first?.date} → {last?.date}</span>
+        <span>
+          {first?.date} → {last?.date}
+        </span>
       </div>
 
-      <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: '120px' }}>
-        <polyline points={points} fill="none" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+      <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: '180px' }}>
+        <polyline
+          points={points}
+          fill="none"
+          stroke="#0f172a"
+          strokeWidth="4"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
       </svg>
 
       <div style={chartFooterStyle}>
@@ -530,78 +881,47 @@ function MiniPriceChart({ prices, stock }) {
   )
 }
 
-const panelStyle = {
-  border: '1px solid rgba(148, 163, 184, 0.35)',
-  borderRadius: '20px',
-  padding: '16px',
-  background: 'rgba(255, 255, 255, 0.92)',
-  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)'
-}
-
-const topRowStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: '12px',
-  alignItems: 'center'
-}
-
-const gridStyle = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-  gap: '10px',
-  marginTop: '14px'
-}
-
-const cardGridStyle = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))',
-  gap: '8px',
-  marginTop: '10px'
-}
-
 const labelStyle = {
   display: 'flex',
   flexDirection: 'column',
   gap: '5px',
   fontSize: '12px',
-  color: '#475569',
-  fontWeight: 700
+  color: '#6b4f34',
+  fontWeight: 800
 }
 
 const inputStyle = {
   width: '100%',
   boxSizing: 'border-box',
-  border: '1px solid rgba(148, 163, 184, 0.45)',
+  border: '1px solid rgba(160, 128, 96, 0.35)',
   borderRadius: '12px',
-  padding: '9px 10px',
-  background: 'rgba(255, 255, 255, 0.95)',
-  color: '#0f172a',
+  padding: '10px 11px',
+  background: 'rgba(255, 255, 255, 0.98)',
+  color: '#2f2418',
   fontSize: '13px',
   outline: 'none'
 }
 
 const primaryButtonStyle = {
+  width: '100%',
   border: 0,
-  borderRadius: '999px',
-  padding: '0 16px',
-  height: '38px',
-  background: '#0f172a',
+  borderRadius: '14px',
+  padding: '12px 16px',
+  background: '#3b2a1c',
   color: 'white',
   cursor: 'pointer',
-  whiteSpace: 'nowrap',
-  fontWeight: 700
+  fontWeight: 900
 }
 
 const infoCardStyle = {
-  borderRadius: '12px',
-  padding: '10px 12px',
+  borderRadius: '16px',
+  padding: '14px',
   background: '#f8fafc',
   border: '1px solid rgba(148, 163, 184, 0.25)'
 }
 
 const chartBoxStyle = {
-  marginTop: '10px',
-  borderRadius: '14px',
+  borderRadius: '16px',
   padding: '12px',
   background: '#f8fafc',
   border: '1px solid rgba(148, 163, 184, 0.25)'
@@ -611,7 +931,7 @@ const chartHeaderStyle = {
   display: 'flex',
   justifyContent: 'space-between',
   gap: '8px',
-  fontSize: '12px',
+  fontSize: '13px',
   color: '#475569',
   flexWrap: 'wrap'
 }
@@ -624,33 +944,6 @@ const chartFooterStyle = {
   color: '#64748b'
 }
 
-const selectedStockStyle = {
-  marginTop: '10px',
-  padding: '9px 12px',
-  borderRadius: '12px',
-  background: '#ecfeff',
-  color: '#155e75',
-  fontSize: '13px',
-  fontWeight: 700
-}
-
-const candidateBoxStyle = {
-  marginTop: '10px',
-  padding: '10px 12px',
-  borderRadius: '14px',
-  background: '#fffbeb',
-  border: '1px solid rgba(245, 158, 11, 0.3)',
-  fontSize: '13px',
-  color: '#78350f'
-}
-
-const candidateListStyle = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: '8px',
-  marginTop: '8px'
-}
-
 const candidateButtonStyle = {
   border: '1px solid rgba(245, 158, 11, 0.4)',
   borderRadius: '999px',
@@ -659,15 +952,7 @@ const candidateButtonStyle = {
   color: '#78350f',
   cursor: 'pointer',
   fontSize: '12px',
-  fontWeight: 700
-}
-
-const bottomInputRowStyle = {
-  display: 'flex',
-  gap: '10px',
-  alignItems: 'end',
-  marginTop: '10px',
-  flexWrap: 'wrap'
+  fontWeight: 800
 }
 
 const errorStyle = {
@@ -677,5 +962,5 @@ const errorStyle = {
   background: '#fef2f2',
   color: '#b91c1c',
   fontSize: '13px',
-  fontWeight: 700
+  fontWeight: 800
 }
