@@ -1,86 +1,27 @@
 .app {
   display: flex;
   height: 100vh;
-  height: 100dvh;        /* 모바일 Safari 주소창 보정 */
+  height: 100dvh;
   overflow: hidden;
 }
 
-/* ── 모바일 (≤768px): 위·아래 split ── */
+/* 기존 앱 구조 fallback */
 @media (max-width: 768px) {
   .app {
     flex-direction: column;
   }
 }
+
+/* ─────────────────────────────
+   Mind Guard 전체 레이아웃
+   왼쪽/가운데: 투자 대시보드
+   오른쪽: 숨돌이 코치 영역
+───────────────────────────── */
+
 .mindGuardApp {
   width: 100%;
   height: 100vh;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
-  background: #fffaf3;
-  overflow: hidden;
-}
-
-.mindGuardCoachPanel {
-  min-width: 0;
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  border-left: 1px solid rgba(120, 83, 45, 0.14);
-  background: #fffdf8;
-  overflow: hidden;
-}
-
-.mindGuardAvatarSlot {
-  flex: 0 0 260px;
-  min-height: 0;
-  overflow: hidden;
-  border-bottom: 1px solid rgba(120, 83, 45, 0.12);
-}
-
-.mindGuardAvatarSlot > * {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-@media (max-width: 1100px) {
-  .mindGuardApp {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(520px, 58vh) minmax(420px, 42vh);
-    overflow: auto;
-  }
-
-  .mindGuardCoachPanel {
-    border-left: 0;
-    border-top: 1px solid rgba(120, 83, 45, 0.14);
-    min-height: 520px;
-  }
-
-  .mindGuardAvatarSlot {
-    display: none;
-  }
-}
-
-@media (max-width: 640px) {
-  .mindGuardApp {
-    height: auto;
-    min-height: 100vh;
-    display: block;
-    overflow: auto;
-  }
-
-  .mindGuardCoachPanel {
-    min-height: 560px;
-  }
-
-  .mindGuardAvatarSlot {
-    display: none;
-  }
-}
-.mindGuardApp {
-  width: 100%;
-  height: 100vh;
+  height: 100dvh;
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 520px;
@@ -88,6 +29,7 @@
   overflow: hidden;
 }
 
+/* 오른쪽 숨돌이 영역 */
 .mindGuardCoachPanel {
   min-width: 0;
   height: 100%;
@@ -99,145 +41,13 @@
   overflow: hidden;
 }
 
-.mindGuardCoachTop {
-  flex: 0 0 auto;
-  padding: 14px 16px;
-  border-bottom: 1px solid rgba(120, 83, 45, 0.12);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  background: rgba(255, 250, 243, 0.95);
-}
-
-.mindGuardCoachTop strong {
-  display: block;
-  font-size: 15px;
-  color: #3b2a1c;
-}
-
-.mindGuardCoachTop p {
-  margin: 3px 0 0;
-  font-size: 12px;
-  color: #8a6a4a;
-}
-
-.coachModeTabs {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.coachModeButton {
-  border: 1px solid rgba(120, 83, 45, 0.18);
-  border-radius: 999px;
-  padding: 7px 10px;
-  background: #fffdf8;
-  color: #6b4f34;
-  font-size: 12px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.coachModeButtonActive {
-  background: #3b2a1c;
-  color: white;
-  border-color: #3b2a1c;
-}
-
+/* 상단: 텍스트/음성/아바타 모드 영역 */
 .mindGuardAvatarSlot {
-  flex: 0 0 340px;
+  flex: 0 0 clamp(240px, 34vh, 340px);
   min-height: 0;
   overflow: hidden;
   border-bottom: 1px solid rgba(120, 83, 45, 0.12);
-}
-
-.mindGuardAvatarSlot > * {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-@media (max-width: 1180px) {
-  .mindGuardApp {
-    grid-template-columns: minmax(0, 1fr) 460px;
-  }
-
-  .mindGuardAvatarSlot {
-    flex-basis: 300px;
-  }
-}
-
-@media (max-width: 980px) {
-  .mindGuardApp {
-    height: auto;
-    min-height: 100vh;
-    display: block;
-    overflow: auto;
-  }
-
-  .mindGuardCoachPanel {
-    min-height: 680px;
-    border-left: 0;
-    border-top: 1px solid rgba(120, 83, 45, 0.14);
-  }
-
-  .mindGuardAvatarSlot {
-    display: none;
-  }
-}
-
-@media (max-width: 640px) {
-  .mindGuardCoachTop {
-    display: block;
-  }
-
-  .coachModeTabs {
-    margin-top: 10px;
-    justify-content: flex-start;
-  }
-
-  .mindGuardCoachPanel {
-    min-height: 620px;
-  }
-}
-.mindGuardApp {
-  width: 100%;
-  height: 100vh;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 520px;
   background: #fffaf3;
-  overflow: hidden;
-}
-
-.mindGuardCoachPanel {
-  min-width: 0;
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  border-left: 1px solid rgba(120, 83, 45, 0.14);
-  background: #fffdf8;
-  overflow: hidden;
-}
-
-.mindGuardCoachPanelNormal {
-  display: flex;
-  flex-direction: column;
-}
-
-.mindGuardCoachPanelFtf {
-  display: flex;
-  flex-direction: column;
-}
-
-.mindGuardAvatarSlot {
-  flex: 0 0 300px;
-  min-height: 0;
-  overflow: hidden;
-  border-bottom: 1px solid rgba(120, 83, 45, 0.12);
-  background: #f8f3ea;
 }
 
 .mindGuardAvatarSlot > * {
@@ -246,12 +56,14 @@
   min-height: 0 !important;
 }
 
+/* 하단: 실제 대화창 */
 .mindGuardChatSlot {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  background: #fffdf8;
 }
 
 .mindGuardChatSlot > * {
@@ -260,10 +72,23 @@
   min-height: 0 !important;
 }
 
-/* 태블릿 */
-@media (max-width: 1280px) {
+/* ─────────────────────────────
+   화면 폭 대응
+───────────────────────────── */
+
+@media (max-width: 1400px) {
   .mindGuardApp {
-    grid-template-columns: minmax(0, 1fr) 460px;
+    grid-template-columns: minmax(0, 1fr) 480px;
+  }
+
+  .mindGuardAvatarSlot {
+    flex-basis: clamp(220px, 32vh, 310px);
+  }
+}
+
+@media (max-width: 1180px) {
+  .mindGuardApp {
+    grid-template-columns: minmax(0, 1fr) 440px;
   }
 
   .mindGuardAvatarSlot {
@@ -271,7 +96,7 @@
   }
 }
 
-/* 모바일/좁은 화면 */
+/* 태블릿/작은 노트북: 위는 투자 대시보드, 아래는 숨돌이 */
 @media (max-width: 980px) {
   .mindGuardApp {
     height: auto;
@@ -287,13 +112,21 @@
   }
 
   .mindGuardAvatarSlot {
-    flex: 0 0 220px;
+    flex: 0 0 260px;
+  }
+
+  .mindGuardChatSlot {
+    min-height: 420px;
   }
 }
 
+/* 모바일 */
 @media (max-width: 640px) {
   .mindGuardApp {
+    height: auto;
+    min-height: 100vh;
     display: block;
+    overflow: auto;
   }
 
   .mindGuardCoachPanel {
@@ -301,6 +134,21 @@
   }
 
   .mindGuardAvatarSlot {
-    flex: 0 0 190px;
+    flex: 0 0 220px;
+  }
+
+  .mindGuardChatSlot {
+    min-height: 420px;
+  }
+}
+
+/* 아주 작은 모바일 */
+@media (max-width: 420px) {
+  .mindGuardAvatarSlot {
+    flex: 0 0 200px;
+  }
+
+  .mindGuardCoachPanel {
+    min-height: 640px;
   }
 }
