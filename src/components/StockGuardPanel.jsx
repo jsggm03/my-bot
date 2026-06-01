@@ -16,6 +16,7 @@ export default function StockGuardPanel({ onSendToChat }) {
   })
 
   const [stockData, setStockData] = useState(null)
+  const [candidates, setCandidates] = useState([])
   const [loadingStock, setLoadingStock] = useState(false)
   const [stockError, setStockError] = useState('')
 
@@ -86,9 +87,6 @@ export default function StockGuardPanel({ onSendToChat }) {
       : null
 
     const addedBuyAmount = current > 0 && tradeQuantity > 0 ? current * tradeQuantity : null
-    const sellAmount = current > 0 && tradeQuantity > 0 ? current * tradeQuantity : null
-    const remainingQuantity =
-      quantity > 0 && tradeQuantity > 0 ? Math.max(quantity - tradeQuantity, 0) : null
 
     let decisionHint = '기준 점검 필요'
     const actionMeaning = getActionMeaning()
@@ -112,13 +110,8 @@ export default function StockGuardPanel({ onSendToChat }) {
     }
 
     return {
-      avg,
-      current,
-      quantity,
-      tradeQuantity,
       profitRate,
       holdingValue,
-      investedAmount,
       profitAmount,
       stopLossPrice,
       targetPrice,
@@ -126,17 +119,16 @@ export default function StockGuardPanel({ onSendToChat }) {
       targetReached,
       newAverageAfterBuy,
       addedBuyAmount,
-      sellAmount,
-      remainingQuantity,
       decisionHint
     }
   }, [form, stockData])
 
-  const loadStock = async (name) => {
-    const trimmedName = String(name || '').trim()
+  const loadStock = async (query) => {
+    const trimmed = String(query || '').trim()
 
-    if (trimmedName.length < 2) {
+    if (trimmed.length < 2) {
       setStockData(null)
+      setCandidates([])
       setStockError('')
       updateForm('currentPrice', '')
       return
@@ -146,21 +138,35 @@ export default function StockGuardPanel({ onSendToChat }) {
     setStockError('')
 
     try {
-      const response = await fetch(`/api/stock?name=${encodeURIComponent(trimmedName)}`)
+      const response = await fetch(`/api/stock?name=${encodeURIComponent(trimmed)}`)
       const data = await response.json()
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || data.kisMessage || '주가 데이터를 불러오지 못했습니다.')
+      if (data.error === 'ambiguous_stock') {
+        setStockData(null)
+        setCandidates(data.candidates || [])
+        updateForm('currentPrice', '')
+        setStockError('')
+        return
       }
 
-      lastLoadedNameRef.current = trimmedName
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || '주가 데이터를 불러오지 못했습니다.')
+      }
+
+      setCandidates([])
       setStockData(data)
+      lastLoadedNameRef.current = data.stock?.name || trimmed
+
+      if (data.stock?.name) {
+        updateForm('stockName', data.stock.name)
+      }
 
       if (data.summary?.currentPrice) {
         updateForm('currentPrice', String(data.summary.currentPrice))
       }
     } catch (error) {
       setStockData(null)
+      setCandidates([])
       updateForm('currentPrice', '')
       setStockError(error.message || '주가 데이터를 불러오는 중 오류가 발생했습니다.')
     } finally {
@@ -188,10 +194,14 @@ export default function StockGuardPanel({ onSendToChat }) {
     }
   }, [form.stockName])
 
+  const handleCandidateClick = (candidate) => {
+    setCandidates([])
+    updateForm('stockName', candidate.name)
+    loadStock(candidate.code)
+  }
+
   const buildDataSummary = () => {
-    if (!stockData?.summary) {
-      return '주가 데이터: 아직 불러오지 않음'
-    }
+    if (!stockData?.summary) return '주가 데이터: 아직 불러오지 않음'
 
     const { stock, current, summary } = stockData
 
@@ -237,12 +247,6 @@ export default function StockGuardPanel({ onSendToChat }) {
 - 추가매수 예상 금액: ${
       analysis.addedBuyAmount !== null ? `${Math.round(analysis.addedBuyAmount)}원` : '계산 불가'
     }
-- 일부 매도 예상 금액: ${
-      analysis.sellAmount !== null ? `${Math.round(analysis.sellAmount)}원` : '계산 불가'
-    }
-- 일부 매도 후 남는 수량: ${
-      analysis.remainingQuantity !== null ? `${analysis.remainingQuantity}주` : '계산 불가'
-    }
 - 판단 힌트: ${analysis.decisionHint}
 `.trim()
   }
@@ -281,29 +285,17 @@ ${buildAnalysisSummary()}
 - 첫 문장은 사용자의 감정을 인정하는 문장으로 시작해.
 - 현재 손익률, 손절 기준 도달 여부, 최근 20거래일 흐름, 고점 대비 하락률, 추가매수 후 평단을 반드시 고려해.
 - 매수/매도하라고 직접 지시하지 마.
-- "지금 사세요", "지금 파세요", "무조건 보유하세요" 같은 표현 금지.
 - 특정 결과를 예측하지 말고, 현재 데이터가 보여주는 위험과 점검 포인트를 설명해.
 - 답변 마지막에는 사용자가 바로 생각할 수 있는 확인 질문 1개만 던져.
 `.trim()
 
     if (typeof onSendToChat === 'function') {
-      onSendToChat({
-        message,
-        displayText
-      })
+      onSendToChat({ message, displayText })
     }
   }
 
   return (
-    <section
-      style={{
-        border: '1px solid rgba(148, 163, 184, 0.35)',
-        borderRadius: '20px',
-        padding: '16px',
-        background: 'rgba(255, 255, 255, 0.92)',
-        boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)'
-      }}
-    >
+    <section style={panelStyle}>
       <div style={topRowStyle}>
         <div>
           <h2 style={{ margin: 0, fontSize: '18px' }}>🌬️ 숨돌이 투자 점검</h2>
@@ -311,9 +303,8 @@ ${buildAnalysisSummary()}
             종목 데이터와 내 투자 기준을 함께 확인해요.
           </p>
         </div>
-
         <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700 }}>
-          {loadingStock ? '종목 데이터 불러오는 중...' : stockData ? '데이터 연결됨' : '종목명 입력 시 자동 조회'}
+          {loadingStock ? '종목 조회 중...' : stockData ? '데이터 연결됨' : '종목명 입력 시 자동 조회'}
         </div>
       </div>
 
@@ -323,7 +314,7 @@ ${buildAnalysisSummary()}
           <input
             value={form.stockName}
             onChange={(e) => updateForm('stockName', e.target.value)}
-            placeholder="예: 카카오"
+            placeholder="예: 카카오, 삼성전자"
             style={inputStyle}
           />
         </label>
@@ -363,11 +354,7 @@ ${buildAnalysisSummary()}
 
         <label style={labelStyle}>
           지금 고민
-          <select
-            value={form.action}
-            onChange={(e) => updateForm('action', e.target.value)}
-            style={inputStyle}
-          >
+          <select value={form.action} onChange={(e) => updateForm('action', e.target.value)} style={inputStyle}>
             <option>더 살까?</option>
             <option>팔까?</option>
             <option>기다릴까?</option>
@@ -376,11 +363,7 @@ ${buildAnalysisSummary()}
 
         <label style={labelStyle}>
           투자 기간
-          <select
-            value={form.horizon}
-            onChange={(e) => updateForm('horizon', e.target.value)}
-            style={inputStyle}
-          >
+          <select value={form.horizon} onChange={(e) => updateForm('horizon', e.target.value)} style={inputStyle}>
             <option>오늘 안에 결정하고 싶어요</option>
             <option>며칠~몇 주 보고 있어요</option>
             <option>몇 달 이상 들고 갈 생각이에요</option>
@@ -389,11 +372,7 @@ ${buildAnalysisSummary()}
 
         <label style={labelStyle}>
           현재 감정
-          <select
-            value={form.emotion}
-            onChange={(e) => updateForm('emotion', e.target.value)}
-            style={inputStyle}
-          >
+          <select value={form.emotion} onChange={(e) => updateForm('emotion', e.target.value)} style={inputStyle}>
             <option>불안</option>
             <option>분노</option>
             <option>공포</option>
@@ -426,7 +405,31 @@ ${buildAnalysisSummary()}
         </label>
       </div>
 
+      {candidates.length > 0 && (
+        <div style={candidateBoxStyle}>
+          <strong>어떤 종목을 말하나요?</strong>
+          <div style={candidateListStyle}>
+            {candidates.map((candidate) => (
+              <button
+                key={candidate.code}
+                type="button"
+                onClick={() => handleCandidateClick(candidate)}
+                style={candidateButtonStyle}
+              >
+                {candidate.name} <span>{candidate.code}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {stockError && <p style={errorStyle}>{stockError}</p>}
+
+      {stockData?.stock && (
+        <div style={selectedStockStyle}>
+          조회 종목: <strong>{stockData.stock.name}</strong> {stockData.stock.code} · {stockData.stock.market}
+        </div>
+      )}
 
       {stockData?.summary && (
         <>
@@ -436,41 +439,18 @@ ${buildAnalysisSummary()}
             <InfoCard label="20거래일" value={`${stockData.summary.change20d}%`} />
             <InfoCard label="고점 대비" value={`${stockData.summary.drawdownFromHigh}%`} />
           </div>
-
-          <MiniPriceChart prices={stockData.prices || []} />
+          <MiniPriceChart prices={stockData.prices || []} stock={stockData.stock} />
         </>
       )}
 
       <div style={cardGridStyle}>
-        <InfoCard
-          label="현재 손익률"
-          value={analysis.profitRate !== null ? formatPercent(analysis.profitRate) : '-'}
-          emphasize={analysis.profitRate < 0 ? 'bad' : 'good'}
-        />
-        <InfoCard
-          label="평가손익"
-          value={analysis.profitAmount !== null ? formatWon(analysis.profitAmount) : '-'}
-          emphasize={analysis.profitAmount < 0 ? 'bad' : 'good'}
-        />
-        <InfoCard
-          label="손절 기준"
-          value={analysis.stopLossReached ? '도달' : '미도달'}
-          emphasize={analysis.stopLossReached ? 'bad' : 'neutral'}
-        />
-        <InfoCard
-          label="추가매수 후 평단"
-          value={analysis.newAverageAfterBuy !== null ? formatWon(analysis.newAverageAfterBuy) : '-'}
-        />
+        <InfoCard label="현재 손익률" value={analysis.profitRate !== null ? formatPercent(analysis.profitRate) : '-'} emphasize={analysis.profitRate < 0 ? 'bad' : 'good'} />
+        <InfoCard label="평가손익" value={analysis.profitAmount !== null ? formatWon(analysis.profitAmount) : '-'} emphasize={analysis.profitAmount < 0 ? 'bad' : 'good'} />
+        <InfoCard label="손절 기준" value={analysis.stopLossReached ? '도달' : '미도달'} emphasize={analysis.stopLossReached ? 'bad' : 'neutral'} />
+        <InfoCard label="추가매수 후 평단" value={analysis.newAverageAfterBuy !== null ? formatWon(analysis.newAverageAfterBuy) : '-'} />
       </div>
 
-      <div
-        style={{
-          display: 'flex',
-          gap: '10px',
-          alignItems: 'end',
-          marginTop: '10px'
-        }}
-      >
+      <div style={bottomInputRowStyle}>
         <label style={{ ...labelStyle, flex: 1 }}>
           지금 고민 한 줄
           <input
@@ -487,15 +467,7 @@ ${buildAnalysisSummary()}
           />
         </label>
 
-        <button
-          type="button"
-          onClick={handleSubmit}
-          style={{
-            ...primaryButtonStyle,
-            height: '38px',
-            padding: '0 16px'
-          }}
-        >
+        <button type="button" onClick={handleSubmit} style={primaryButtonStyle}>
           점검받기
         </button>
       </div>
@@ -504,22 +476,18 @@ ${buildAnalysisSummary()}
 }
 
 function InfoCard({ label, value, emphasize = 'neutral' }) {
-  const color =
-    emphasize === 'bad' ? '#dc2626' : emphasize === 'good' ? '#047857' : '#0f172a'
+  const color = emphasize === 'bad' ? '#dc2626' : emphasize === 'good' ? '#047857' : '#0f172a'
 
   return (
     <div style={infoCardStyle}>
       <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>{label}</div>
-      <div style={{ marginTop: '4px', fontSize: '15px', color, fontWeight: 800 }}>
-        {value}
-      </div>
+      <div style={{ marginTop: '4px', fontSize: '15px', color, fontWeight: 800 }}>{value}</div>
     </div>
   )
 }
 
-function MiniPriceChart({ prices }) {
+function MiniPriceChart({ prices, stock }) {
   const chartPrices = prices.slice(-60)
-
   if (!chartPrices.length) return null
 
   const width = 520
@@ -532,13 +500,8 @@ function MiniPriceChart({ prices }) {
 
   const points = chartPrices
     .map((p, index) => {
-      const x =
-        padding +
-        (index / Math.max(chartPrices.length - 1, 1)) * (width - padding * 2)
-      const y =
-        padding +
-        ((max - p.close) / range) * (height - padding * 2)
-
+      const x = padding + (index / Math.max(chartPrices.length - 1, 1)) * (width - padding * 2)
+      const y = padding + ((max - p.close) / range) * (height - padding * 2)
       return `${x},${y}`
     })
     .join(' ')
@@ -549,21 +512,14 @@ function MiniPriceChart({ prices }) {
   return (
     <div style={chartBoxStyle}>
       <div style={chartHeaderStyle}>
-        <strong>최근 60거래일 종가 흐름</strong>
-        <span>
-          {first?.date} → {last?.date}
-        </span>
+        <strong>
+          {stock?.name} {stock?.code} · 최근 60거래일
+        </strong>
+        <span>{first?.date} → {last?.date}</span>
       </div>
 
       <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: '120px' }}>
-        <polyline
-          points={points}
-          fill="none"
-          stroke="#0f172a"
-          strokeWidth="3"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
+        <polyline points={points} fill="none" stroke="#0f172a" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
       </svg>
 
       <div style={chartFooterStyle}>
@@ -572,6 +528,14 @@ function MiniPriceChart({ prices }) {
       </div>
     </div>
   )
+}
+
+const panelStyle = {
+  border: '1px solid rgba(148, 163, 184, 0.35)',
+  borderRadius: '20px',
+  padding: '16px',
+  background: 'rgba(255, 255, 255, 0.92)',
+  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)'
 }
 
 const topRowStyle = {
@@ -619,7 +583,8 @@ const inputStyle = {
 const primaryButtonStyle = {
   border: 0,
   borderRadius: '999px',
-  padding: '10px 14px',
+  padding: '0 16px',
+  height: '38px',
   background: '#0f172a',
   color: 'white',
   cursor: 'pointer',
@@ -647,7 +612,8 @@ const chartHeaderStyle = {
   justifyContent: 'space-between',
   gap: '8px',
   fontSize: '12px',
-  color: '#475569'
+  color: '#475569',
+  flexWrap: 'wrap'
 }
 
 const chartFooterStyle = {
@@ -656,6 +622,52 @@ const chartFooterStyle = {
   gap: '8px',
   fontSize: '12px',
   color: '#64748b'
+}
+
+const selectedStockStyle = {
+  marginTop: '10px',
+  padding: '9px 12px',
+  borderRadius: '12px',
+  background: '#ecfeff',
+  color: '#155e75',
+  fontSize: '13px',
+  fontWeight: 700
+}
+
+const candidateBoxStyle = {
+  marginTop: '10px',
+  padding: '10px 12px',
+  borderRadius: '14px',
+  background: '#fffbeb',
+  border: '1px solid rgba(245, 158, 11, 0.3)',
+  fontSize: '13px',
+  color: '#78350f'
+}
+
+const candidateListStyle = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '8px',
+  marginTop: '8px'
+}
+
+const candidateButtonStyle = {
+  border: '1px solid rgba(245, 158, 11, 0.4)',
+  borderRadius: '999px',
+  padding: '7px 10px',
+  background: 'white',
+  color: '#78350f',
+  cursor: 'pointer',
+  fontSize: '12px',
+  fontWeight: 700
+}
+
+const bottomInputRowStyle = {
+  display: 'flex',
+  gap: '10px',
+  alignItems: 'end',
+  marginTop: '10px',
+  flexWrap: 'wrap'
 }
 
 const errorStyle = {
