@@ -21,7 +21,7 @@
   height: 100dvh;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 520px;
+  grid-template-columns: minmax(0, 1fr) clamp(540px, 34vw, 640px);
   background: #fffaf3;
   overflow: hidden;
 }
@@ -41,15 +41,14 @@
 /* 상단 AvatarPanel 영역 */
 .mindGuardAvatarSlot {
   min-height: 0;
-  overflow: hidden;
   border-bottom: 1px solid rgba(120, 83, 45, 0.12);
   background: #fffaf3;
   transition: flex-basis 0.2s ease;
 }
 
+/* AvatarPanel 기본 */
 .mindGuardAvatarSlot > * {
   width: 100% !important;
-  height: 100% !important;
   min-height: 0 !important;
 }
 
@@ -70,31 +69,59 @@
 }
 
 /* ─────────────────────────────
-   모드별 오른쪽 영역 높이
-   텍스트: 상단 작게
-   음성: 중간
-   아바타: 크게
+   모드별 오른쪽 상단 높이
 ───────────────────────────── */
 
+/* 텍스트 모드: 버튼/상태만 보이면 되므로 작게 */
 .coachTextMode .mindGuardAvatarSlot {
   flex: 0 0 126px;
+  overflow: hidden;
 }
 
+.coachTextMode .mindGuardAvatarSlot > * {
+  height: 100% !important;
+}
+
+/* 음성 모드: 마이크 화면이 잘 보이도록 중간 높이 */
 .coachVoiceMode .mindGuardAvatarSlot {
-  flex: 0 0 280px;
+  flex: 0 0 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
+.coachVoiceMode .mindGuardAvatarSlot > * {
+  height: 100% !important;
+}
+
+/* 아바타 모드: 아바타 카드/카메라/버튼이 잘리지 않도록 크게 */
 .coachAvatarMode .mindGuardAvatarSlot {
-  flex: 0 0 360px;
+  flex: 0 0 clamp(440px, 52vh, 560px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.coachAvatarMode .mindGuardAvatarSlot > * {
+  height: auto !important;
+  min-height: 100% !important;
 }
 
 /* ─────────────────────────────
    반응형
 ───────────────────────────── */
 
-@media (max-width: 1400px) {
+@media (max-width: 1500px) {
   .mindGuardApp {
-    grid-template-columns: minmax(0, 1fr) 500px;
+    grid-template-columns: minmax(0, 1fr) 560px;
+  }
+
+  .coachAvatarMode .mindGuardAvatarSlot {
+    flex-basis: clamp(420px, 50vh, 520px);
+  }
+}
+
+@media (max-width: 1280px) {
+  .mindGuardApp {
+    grid-template-columns: minmax(0, 1fr) 520px;
   }
 
   .coachTextMode .mindGuardAvatarSlot {
@@ -102,29 +129,11 @@
   }
 
   .coachVoiceMode .mindGuardAvatarSlot {
-    flex-basis: 250px;
+    flex-basis: 270px;
   }
 
   .coachAvatarMode .mindGuardAvatarSlot {
-    flex-basis: 320px;
-  }
-}
-
-@media (max-width: 1180px) {
-  .mindGuardApp {
-    grid-template-columns: minmax(0, 1fr) 460px;
-  }
-
-  .coachTextMode .mindGuardAvatarSlot {
-    flex-basis: 116px;
-  }
-
-  .coachVoiceMode .mindGuardAvatarSlot {
-    flex-basis: 230px;
-  }
-
-  .coachAvatarMode .mindGuardAvatarSlot {
-    flex-basis: 300px;
+    flex-basis: 460px;
   }
 }
 
@@ -138,7 +147,7 @@
   }
 
   .mindGuardCoachPanel {
-    min-height: 720px;
+    min-height: 760px;
     border-left: 0;
     border-top: 1px solid rgba(120, 83, 45, 0.14);
   }
@@ -148,11 +157,11 @@
   }
 
   .coachVoiceMode .mindGuardAvatarSlot {
-    flex-basis: 240px;
+    flex-basis: 260px;
   }
 
   .coachAvatarMode .mindGuardAvatarSlot {
-    flex-basis: 300px;
+    flex-basis: 420px;
   }
 
   .mindGuardChatSlot {
@@ -162,7 +171,7 @@
 
 @media (max-width: 640px) {
   .mindGuardCoachPanel {
-    min-height: 680px;
+    min-height: 720px;
   }
 
   .coachTextMode .mindGuardAvatarSlot {
@@ -170,11 +179,11 @@
   }
 
   .coachVoiceMode .mindGuardAvatarSlot {
-    flex-basis: 230px;
+    flex-basis: 240px;
   }
 
   .coachAvatarMode .mindGuardAvatarSlot {
-    flex-basis: 280px;
+    flex-basis: 390px;
   }
 
   .mindGuardChatSlot {
@@ -183,19 +192,11 @@
 }
 
 @media (max-width: 420px) {
-  .coachTextMode .mindGuardAvatarSlot {
-    flex-basis: 108px;
-  }
-
-  .coachVoiceMode .mindGuardAvatarSlot {
-    flex-basis: 220px;
-  }
-
   .coachAvatarMode .mindGuardAvatarSlot {
-    flex-basis: 260px;
+    flex-basis: 360px;
   }
 
   .mindGuardCoachPanel {
-    min-height: 640px;
+    min-height: 700px;
   }
 }
