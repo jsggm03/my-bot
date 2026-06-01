@@ -669,79 +669,50 @@ if (sessionIdRef.current) {
   <div className={styles.mindGuardApp}>
     <StockGuardPanel onSendToChat={sendMessage} />
 
-    <aside className={styles.mindGuardCoachPanel}>
-      <div className={styles.mindGuardCoachTop}>
-        <div>
-          <strong>숨돌이 코치</strong>
-          <p>데이터를 보고, 마지막 판단을 같이 점검해요</p>
+    <aside
+      className={`${styles.mindGuardCoachPanel} ${
+        conversationMode === 'ftf'
+          ? styles.mindGuardCoachPanelFtf
+          : styles.mindGuardCoachPanelNormal
+      }`}
+    >
+      {conversationMode === 'ftf' && (
+        <div className={styles.mindGuardAvatarSlot}>
+          <AvatarPanel
+            status={status}
+            mode={conversationMode}
+            onModeChange={changeConversationMode}
+            vrmAvatarRef={vrmAvatarRef}
+            onAvatarReady={handleAvatarReady}
+            userVideoRef={userVideoRef}
+            videoReady={videoReady}
+            cameraActive={Boolean(cameraStream)}
+            onStart={startConversation}
+            onStop={stopAvatar}
+            onInterrupt={interruptAvatar}
+            isListening={isListening}
+          />
         </div>
+      )}
 
-        <div className={styles.coachModeTabs}>
-          <button
-            type="button"
-            onClick={() => changeConversationMode('ttt')}
-            className={`${styles.coachModeButton} ${
-              conversationMode === 'ttt' ? styles.coachModeButtonActive : ''
-            }`}
-          >
-            💬 텍스트
-          </button>
-
-          <button
-            type="button"
-            onClick={() => changeConversationMode('sts')}
-            className={`${styles.coachModeButton} ${
-              conversationMode === 'sts' ? styles.coachModeButtonActive : ''
-            }`}
-          >
-            🎙️ 음성
-          </button>
-
-          <button
-            type="button"
-            onClick={() => changeConversationMode('ftf')}
-            className={`${styles.coachModeButton} ${
-              conversationMode === 'ftf' ? styles.coachModeButtonActive : ''
-            }`}
-          >
-            🧑‍💻 아바타
-          </button>
-        </div>
-      </div>
-
-      <div className={styles.mindGuardAvatarSlot}>
-        <AvatarPanel
-          status={status}
-          mode={conversationMode}
-          onModeChange={changeConversationMode}
-          vrmAvatarRef={vrmAvatarRef}
-          onAvatarReady={handleAvatarReady}
-          userVideoRef={userVideoRef}
-          videoReady={videoReady}
-          cameraActive={Boolean(cameraStream)}
-          onStart={startConversation}
-          onStop={stopAvatar}
-          onInterrupt={interruptAvatar}
+      <div className={styles.mindGuardChatSlot}>
+        <ChatPanel
+          messages={messages}
+          isProcessing={isProcessing}
+          onSend={sendMessage}
+          connected={isChatConnected}
           isListening={isListening}
+          onToggleMic={toggleMic}
+          micEnabled={conversationMode !== 'ttt' && isChatConnected}
+          micAvailable={conversationMode !== 'ttt'}
+          mode={conversationMode}
+          user={user}
+          onLoginClick={() => setAuthOpen(true)}
+          onLogout={handleLogout}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
       </div>
-
-      <ChatPanel
-        messages={messages}
-        isProcessing={isProcessing}
-        onSend={sendMessage}
-        connected={isChatConnected}
-        isListening={isListening}
-        onToggleMic={toggleMic}
-        micEnabled={conversationMode !== 'ttt' && isChatConnected}
-        micAvailable={conversationMode !== 'ttt'}
-        mode={conversationMode}
-        user={user}
-        onLoginClick={() => setAuthOpen(true)}
-        onLogout={handleLogout}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
     </aside>
 
     <AuthModal
