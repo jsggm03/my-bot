@@ -666,39 +666,25 @@ if (sessionIdRef.current) {
   const isChatConnected = status !== 'idle' && status !== 'connecting'
 
   return (
-  <div className={styles.app}>
-    <AvatarPanel
-      status={status}
-      mode={conversationMode}
-      onModeChange={changeConversationMode}
-      vrmAvatarRef={vrmAvatarRef}
-      onAvatarReady={handleAvatarReady}
-      userVideoRef={userVideoRef}
-      videoReady={videoReady}
-      cameraActive={Boolean(cameraStream)}
-      onStart={startConversation}
-      onStop={stopAvatar}
-      onInterrupt={interruptAvatar}
-      isListening={isListening}
-    />
+  <div className={styles.mindGuardApp}>
+    <StockGuardPanel onSendToChat={sendMessage} />
 
-    <div
-      style={{
-        flex: '1 1 0%',
-        minWidth: 0,
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}
-    >
-      <div
-        style={{
-          flexShrink: 0,
-          padding: '12px 16px 0 16px'
-        }}
-      >
-        <StockGuardPanel onSendToChat={sendMessage} />
+    <aside className={styles.mindGuardCoachPanel}>
+      <div className={styles.mindGuardAvatarSlot}>
+        <AvatarPanel
+          status={status}
+          mode={conversationMode}
+          onModeChange={changeConversationMode}
+          vrmAvatarRef={vrmAvatarRef}
+          onAvatarReady={handleAvatarReady}
+          userVideoRef={userVideoRef}
+          videoReady={videoReady}
+          cameraActive={Boolean(cameraStream)}
+          onStart={startConversation}
+          onStop={stopAvatar}
+          onInterrupt={interruptAvatar}
+          isListening={isListening}
+        />
       </div>
 
       <ChatPanel
@@ -717,7 +703,7 @@ if (sessionIdRef.current) {
         theme={theme}
         onToggleTheme={toggleTheme}
       />
-    </div>
+    </aside>
 
     <AuthModal
       open={authOpen}
