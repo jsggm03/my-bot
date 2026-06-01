@@ -70,20 +70,27 @@ export default function StockGuardPanel({ onSendToChat }) {
   }
 
   const getInvestmentStyle = () => {
-    if (form.horizon === '오늘 안에 결정하고 싶어요') return '단타'
-    if (form.horizon === '며칠~몇 주 보고 있어요') return '스윙'
-    if (form.horizon === '몇 달 이상 들고 갈 생각이에요') return '중장기'
+    if (form.horizon === '오늘 안에 결정하고 싶어요') return '단기 대응'
+    if (form.horizon === '며칠~몇 주 보고 있어요') return '스윙 관점'
+    if (form.horizon === '몇 달 이상 들고 갈 생각이에요') return '중장기 관점'
     return '미입력'
   }
 
   const marketDiagnostics = useMemo(() => {
     if (!stockData?.summary) {
       return {
-        volumeRatio: null,
         latestVolume: null,
         avgVolume20: null,
+        volumeRatio: null,
         flags: [],
-        riskLabels: [{ type: 'neutral', title: '데이터 대기', desc: '종목 데이터를 불러오면 위험 라벨이 표시됩니다.' }]
+        reasonSummary: [],
+        riskLabels: [
+          {
+            type: 'neutral',
+            title: '데이터 대기',
+            desc: '종목 데이터를 불러오면 위험 라벨이 표시됩니다.'
+          }
+        ]
       }
     }
 
@@ -93,60 +100,134 @@ export default function StockGuardPanel({ onSendToChat }) {
 
     const latest = prices[prices.length - 1]
     const recent20 = prices.slice(-20)
+    const recent5 = prices.slice(-5)
+
     const avgVolume20 =
       recent20.length > 0
         ? recent20.reduce((sum, row) => sum + Number(row.volume || 0), 0) / recent20.length
         : 0
 
-    const latestVolume = Number(latest?.volume || current.accumulatedVolume || 0)
+    const avgVolume5 =
+      recent5.length > 0
+        ? recent5.reduce((sum, row) => sum + Number(row.volume || 0), 0) / recent5.length
+        : 0
+
+    const latestVolume = Number(current.accumulatedVolume || latest?.volume || 0)
     const volumeRatio = avgVolume20 > 0 ? latestVolume / avgVolume20 : null
 
     const flags = []
+    const reasonSummary = []
 
-    if (summary.change5d >= 10) flags.push('최근 5거래일 급등')
-    if (summary.change5d <= -8) flags.push('최근 5거래일 급락')
-    if (summary.change20d >= 20) flags.push('최근 20거래일 강한 상승')
-    if (summary.change20d <= -15) flags.push('최근 20거래일 약세')
-    if (summary.drawdownFromHigh > -5) flags.push('90일 고점 근처')
-    if (summary.drawdownFromHigh <= -20) flags.push('고점 대비 큰 하락')
-    if (summary.reboundFromLow >= 30) flags.push('저점 대비 큰 반등')
-    if (volumeRatio !== null && volumeRatio >= 1.8) flags.push('거래량 증가')
+    if (summary.change5d >= 10) {
+      flags.push('최근 5거래일 급등')
+      reasonSummary.push('단기 가격 상승폭이 커서 추격매수 여부를 점검해야 합니다.')
+    }
+
+    if (summary.change5d <= -8) {
+      flags.push('최근 5거래일 급락')
+      reasonSummary.push('단기 하락폭이 커서 공포 매도인지 기준 손절인지 구분해야 합니다.')
+    }
+
+    if (summary.change20d >= 20) {
+      flags.push('최근 20거래일 강한 상승')
+      reasonSummary.push('중기 흐름이 강하게 오른 상태라 이미 가격에 기대가 반영되었을 수 있습니다.')
+    }
+
+    if (summary.change20d <= -15) {
+      flags.push('최근 20거래일 약세')
+      reasonSummary.push('중기 흐름이 약한 상태라 단순 반등만 보고 판단하기 어렵습니다.')
+    }
+
+    if (summary.drawdownFromHigh > -5) {
+      flags.push('90일 고점 근처')
+      reasonSummary.push('90일 고점과 가까워 고점권 매수인지 확인이 필요합니다.')
+    }
+
+    if (summary.drawdownFromHigh <= -20) {
+      flags.push('고점 대비 큰 하락')
+      reasonSummary.push('고점 대비 하락폭이 커서 손실 회피 감정이 강해질 수 있습니다.')
+    }
+
+    if (summary.reboundFromLow >= 30) {
+      flags.push('저점 대비 큰 반등')
+      reasonSummary.push('저점 대비 이미 많이 반등했다면 늦은 진입인지 확인해야 합니다.')
+    }
+
+    if (volumeRatio !== null && volumeRatio >= 1.8) {
+      flags.push('거래량 증가')
+      reasonSummary.push('거래량이 평소보다 늘어 관심이 몰린 구간일 수 있습니다.')
+    }
+
+    if (volumeRatio !== null && volumeRatio < 0.7) {
+      flags.push('거래량 둔화')
+      reasonSummary.push('거래량이 약하면 가격 움직임의 신뢰도를 더 조심해서 봐야 합니다.')
+    }
+
+    const avgPrice = Number(form.averagePrice)
+    const currentPrice = Number(form.currentPrice || summary.currentPrice)
+    const userIsLosing = avgPrice > 0 && currentPrice > 0 && currentPrice < avgPrice
+    const emotionHighRisk = ['불안', '공포', '멘붕', '분노'].includes(form.emotion)
+    const emotionFomo = ['흥분', '불안', '멘붕'].includes(form.emotion)
 
     const riskLabels = []
 
     if (
       form.action === '더 살까?' &&
       (summary.change5d >= 10 || summary.change20d >= 20 || summary.drawdownFromHigh > -5) &&
-      ['흥분', '불안', '멘붕'].includes(form.emotion)
+      emotionFomo
     ) {
       riskLabels.push({
         type: 'warning',
         title: '추격매수 주의',
-        desc: '최근 상승폭이나 고점 근접 상태에서 감정이 앞설 수 있어요.'
+        desc: '최근 상승폭이나 고점 근접 상태에서 “놓칠까 봐” 들어가는 판단인지 확인해야 합니다.'
       })
     }
 
     if (
       form.action === '팔까?' &&
       (summary.change5d <= -8 || summary.change20d <= -15) &&
-      ['불안', '공포', '멘붕', '분노'].includes(form.emotion)
+      emotionHighRisk
     ) {
       riskLabels.push({
         type: 'danger',
         title: '패닉셀 주의',
-        desc: '하락폭보다 먼저, 원래 손절 기준에 따른 판단인지 확인해야 해요.'
+        desc: '하락 자체보다 먼저, 원래 정한 손절 기준에 도달한 매도인지 구분해야 합니다.'
+      })
+    }
+
+    if (form.action === '더 살까?' && userIsLosing) {
+      riskLabels.push({
+        type: 'danger',
+        title: '손실만회 매수 주의',
+        desc: '평단을 낮추는 효과는 있지만 같은 종목에 묶이는 금액도 함께 커집니다.'
+      })
+    }
+
+    if (summary.drawdownFromHigh > -5 && summary.reboundFromLow >= 30) {
+      riskLabels.push({
+        type: 'warning',
+        title: '고점권 판단 주의',
+        desc: '90일 고점 근처이면서 저점 대비 많이 오른 상태라 진입 가격을 더 엄격히 봐야 합니다.'
       })
     }
 
     if (
-      form.action === '더 살까?' &&
-      Number(summary.change20d) <= -10 &&
-      Number(form.averagePrice) > Number(form.currentPrice || summary.currentPrice)
+      summary.drawdownFromHigh <= -20 &&
+      summary.change5d > 0 &&
+      summary.change20d < 0
     ) {
       riskLabels.push({
-        type: 'danger',
-        title: '손실만회 매수 주의',
-        desc: '평단을 낮추는 효과는 있지만 같은 종목에 묶이는 금액도 커져요.'
+        type: 'warning',
+        title: '급락 후 반등 주의',
+        desc: '단기 반등은 있지만 중기 흐름은 아직 약할 수 있어 반등과 추세 전환을 구분해야 합니다.'
+      })
+    }
+
+    if (volumeRatio !== null && volumeRatio >= 1.8 && Math.abs(summary.change5d) >= 8) {
+      riskLabels.push({
+        type: 'warning',
+        title: '거래량 동반 변동',
+        desc: '거래량 증가와 가격 변동이 함께 나타나 공시·뉴스·수급 확인이 필요합니다.'
       })
     }
 
@@ -154,15 +235,17 @@ export default function StockGuardPanel({ onSendToChat }) {
       riskLabels.push({
         type: 'neutral',
         title: '기준 재확인',
-        desc: '뚜렷한 위험 라벨은 없지만, 매매 이유와 기준을 먼저 확인하세요.'
+        desc: '뚜렷한 과열·공포 신호는 약하지만, 매매 이유와 기준은 먼저 확인해야 합니다.'
       })
     }
 
     return {
-      volumeRatio,
       latestVolume,
       avgVolume20,
+      avgVolume5,
+      volumeRatio,
       flags,
+      reasonSummary,
       riskLabels
     }
   }, [stockData, form.action, form.emotion, form.averagePrice, form.currentPrice])
@@ -321,6 +404,14 @@ export default function StockGuardPanel({ onSendToChat }) {
 - 90일 저점 대비 반등률: ${summary.reboundFromLow}%
 - 누적 거래량: ${current?.accumulatedVolume ?? '정보 없음'}
 - 누적 거래대금: ${current?.accumulatedAmount ?? '정보 없음'}
+- 20거래일 평균 대비 거래량: ${
+      marketDiagnostics.volumeRatio
+        ? `${marketDiagnostics.volumeRatio.toFixed(2)}배`
+        : '계산 불가'
+    }
+- 감지 신호: ${
+      marketDiagnostics.flags.length > 0 ? marketDiagnostics.flags.join(', ') : '뚜렷한 신호 없음'
+    }
 `.trim()
   }
 
@@ -354,6 +445,11 @@ export default function StockGuardPanel({ onSendToChat }) {
     }
 - 판단 힌트: ${analysis.decisionHint}
 - 위험 라벨: ${marketDiagnostics.riskLabels.map((label) => label.title).join(', ')}
+- 원인 후보: ${
+      marketDiagnostics.reasonSummary.length > 0
+        ? marketDiagnostics.reasonSummary.join(' / ')
+        : '추가 확인 필요'
+    }
 `.trim()
   }
 
@@ -364,7 +460,7 @@ export default function StockGuardPanel({ onSendToChat }) {
 
     const message = `
 너는 Mind-Guard의 금융 심리 케어 챗봇 '숨돌이'야.
-아래 사용자의 투자 상황, 주가 데이터, 앱 계산 결과, 위험 라벨을 바탕으로 지금 행동이 원칙 매매인지 감정 매매인지 점검해줘.
+아래 사용자의 투자 상황, 주가 데이터, 앱 계산 결과, 위험 라벨, 원인 후보를 바탕으로 지금 행동이 원칙 매매인지 감정 매매인지 점검해줘.
 
 [사용자 입력]
 - 종목명: ${form.stockName || '미입력'}
@@ -604,6 +700,13 @@ ${buildAnalysisSummary()}
           color: #475569;
           font-size: 13px;
           line-height: 1.7;
+        }
+
+        .miniGrid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+          gap: 10px;
+          margin-top: 10px;
         }
 
         @media (max-width: 980px) {
@@ -1041,27 +1144,42 @@ function DetailPanel({
     return (
       <div className="detailPanel">
         <p className="detailPanelTitle">왜 움직였을까? — 원인 후보 체크</p>
-        <ul className="detailList">
-          <li>최근 5거래일 변화율은 {summary.change5d}%입니다.</li>
-          <li>최근 20거래일 변화율은 {summary.change20d}%입니다.</li>
-          <li>90일 고점 대비 {summary.drawdownFromHigh}% 위치에 있습니다.</li>
-          <li>90일 저점 대비 {summary.reboundFromLow}% 반등한 상태입니다.</li>
+
+        <div className="miniGrid">
+          <MiniInsightCard
+            title="가격 위치"
+            text={`90일 고점 대비 ${summary.drawdownFromHigh}%, 90일 저점 대비 ${summary.reboundFromLow}% 위치입니다.`}
+          />
+          <MiniInsightCard
+            title="단기 흐름"
+            text={`최근 5거래일 ${summary.change5d}%, 최근 20거래일 ${summary.change20d}% 흐름입니다.`}
+          />
+          <MiniInsightCard
+            title="거래량 신호"
+            text={
+              marketDiagnostics.volumeRatio
+                ? `최근 거래량은 20거래일 평균 대비 약 ${marketDiagnostics.volumeRatio.toFixed(2)}배입니다.`
+                : '거래량 평균 대비 배율은 아직 계산되지 않았습니다.'
+            }
+          />
+        </div>
+
+        <ul className="detailList" style={{ marginTop: '12px' }}>
+          {marketDiagnostics.reasonSummary.length > 0 ? (
+            marketDiagnostics.reasonSummary.map((text) => <li key={text}>{text}</li>)
+          ) : (
+            <li>현재 데이터만으로는 뚜렷한 급등·급락 원인 후보가 강하게 잡히지 않습니다.</li>
+          )}
           <li>
-            거래량은 최근 20거래일 평균 대비{' '}
-            {marketDiagnostics.volumeRatio
-              ? `${marketDiagnostics.volumeRatio.toFixed(2)}배`
-              : '계산 대기'}{' '}
-            수준입니다.
-          </li>
-          <li>
-            감지된 가격·거래량 신호:{' '}
+            감지된 신호:{' '}
             {marketDiagnostics.flags.length > 0
               ? marketDiagnostics.flags.join(', ')
               : '뚜렷한 급등·급락 신호 없음'}
           </li>
         </ul>
+
         <p style={safeNoticeStyle}>
-          상승·하락의 확정 원인이 아니라, 매매 전 확인해야 할 가능성 있는 요인입니다.
+          상승·하락의 확정 원인이 아니라, 매매 전 확인해야 할 가격·거래량 기반 원인 후보입니다.
         </p>
       </div>
     )
@@ -1071,15 +1189,19 @@ function DetailPanel({
     return (
       <div className="detailPanel">
         <p className="detailPanelTitle">수급 보기 — 다음 고도화 예정</p>
-        <ul className="detailList">
-          <li>개인 순매수/순매도</li>
-          <li>외국인 순매수/순매도</li>
-          <li>기관 순매수/순매도</li>
-          <li>프로그램 매매</li>
-          <li>신용잔고와 공매도 추이</li>
+        <div className="miniGrid">
+          <MiniInsightCard title="개인" text="개인 순매수·순매도 흐름을 확인할 예정입니다." />
+          <MiniInsightCard title="외국인" text="외국인 순매수·순매도 방향을 확인할 예정입니다." />
+          <MiniInsightCard title="기관" text="기관 매매 흐름과 수급 쏠림을 확인할 예정입니다." />
+        </div>
+        <ul className="detailList" style={{ marginTop: '12px' }}>
+          <li>개인 매수 쏠림 여부</li>
+          <li>외국인·기관 동반 매수 또는 동반 매도 여부</li>
+          <li>프로그램 매매, 신용잔고, 공매도 추이</li>
+          <li>수급 데이터는 매수·매도 추천이 아니라 과열·공포 판단 보조지표로 사용할 예정입니다.</li>
         </ul>
         <p style={safeNoticeStyle}>
-          현재 버전에서는 가격·거래량 중심으로 먼저 점검하고, 수급 데이터는 추후 API로 연결할 예정입니다.
+          현재 버전에서는 수급을 단정하지 않고, 가격·거래량 중심으로 먼저 점검합니다.
         </p>
       </div>
     )
@@ -1089,16 +1211,18 @@ function DetailPanel({
     return (
       <div className="detailPanel">
         <p className="detailPanelTitle">공시·뉴스 — 다음 고도화 예정</p>
-        <ul className="detailList">
-          <li>실적 발표</li>
-          <li>공급계약</li>
-          <li>유상증자·무상증자</li>
-          <li>전환사채·신주인수권부사채</li>
-          <li>최대주주 변경</li>
-          <li>소송·제재·투자경고 여부</li>
+        <div className="miniGrid">
+          <MiniInsightCard title="실적" text="실적 발표 또는 실적 전망 변화 여부를 확인할 예정입니다." />
+          <MiniInsightCard title="공시" text="계약, 증자, 전환사채, 최대주주 변경 등을 확인할 예정입니다." />
+          <MiniInsightCard title="주의 이벤트" text="소송, 제재, 투자경고, 관리종목 관련 이슈를 확인할 예정입니다." />
+        </div>
+        <ul className="detailList" style={{ marginTop: '12px' }}>
+          <li>가격 변동과 함께 확인할 이벤트 후보를 표시합니다.</li>
+          <li>뉴스 제목만 보고 원인을 단정하지 않도록 요약·분류 형태로 제공하는 것이 목표입니다.</li>
+          <li>“이 뉴스 때문에 올랐다”가 아니라 “함께 확인할 이벤트”로 표현합니다.</li>
         </ul>
         <p style={safeNoticeStyle}>
-          가격 변동의 원인을 단정하지 않고, 함께 확인할 이벤트 후보로 표시하는 방향이 안전합니다.
+          공시·뉴스는 추후 API로 연결하고, 현재는 가격 변동의 원인을 단정하지 않습니다.
         </p>
       </div>
     )
@@ -1108,14 +1232,19 @@ function DetailPanel({
     return (
       <div className="detailPanel">
         <p className="detailPanelTitle">과거 유사 구간 — 다음 고도화 예정</p>
-        <ul className="detailList">
+        <div className="miniGrid">
+          <MiniInsightCard title="반등 사례" text="유사 낙폭 이후 반등한 구간을 따로 표시할 예정입니다." />
+          <MiniInsightCard title="횡보 사례" text="유사 구간 이후 방향 없이 머문 사례도 함께 표시할 예정입니다." />
+          <MiniInsightCard title="추가 하락 사례" text="유사 구간 이후 더 하락한 사례를 반드시 함께 표시할 예정입니다." />
+        </div>
+        <ul className="detailList" style={{ marginTop: '12px' }}>
           <li>90일 고점 대비 -20% 이상 하락했던 과거 구간</li>
-          <li>이후 20거래일 평균 흐름</li>
-          <li>이후 60거래일 평균 흐름</li>
-          <li>반등 사례, 횡보 사례, 추가 하락 사례를 함께 표시</li>
+          <li>이후 20거래일·60거래일 흐름</li>
+          <li>회복까지 걸린 기간</li>
+          <li>추가 하락 최대폭</li>
         </ul>
         <p style={safeNoticeStyle}>
-          반등 확률처럼 보이게 만들지 않고, 예측이 아닌 과거 참고 분포로만 제공하는 것이 좋습니다.
+          반등 확률처럼 보이게 만들지 않고, 예측이 아닌 과거 참고 분포로만 제공하는 방향이 안전합니다.
         </p>
       </div>
     )
@@ -1124,17 +1253,36 @@ function DetailPanel({
   return (
     <div className="detailPanel">
       <p className="detailPanelTitle">상세 지표</p>
-      <ul className="detailList">
-        <li>현재가: {formatWon(summary.currentPrice)}</li>
-        <li>전일 등락률: {current.previousDayRate ?? '-'}%</li>
-        <li>전일 대비: {formatWon(current.previousDayDiff)}</li>
-        <li>90일 고점: {formatWon(summary.high90d)}</li>
-        <li>90일 저점: {formatWon(summary.low90d)}</li>
-        <li>고점 대비: {summary.drawdownFromHigh}%</li>
-        <li>저점 대비: {summary.reboundFromLow}%</li>
-        <li>누적 거래량: {formatNumber(current.accumulatedVolume)}</li>
-        <li>누적 거래대금: {formatAmountShort(current.accumulatedAmount)}</li>
-      </ul>
+      <div className="miniGrid">
+        <MiniInsightCard title="현재가" text={formatWon(summary.currentPrice)} />
+        <MiniInsightCard title="전일 등락률" text={`${current.previousDayRate ?? '-'}%`} />
+        <MiniInsightCard title="전일 대비" text={formatWon(current.previousDayDiff)} />
+        <MiniInsightCard title="90일 고점" text={formatWon(summary.high90d)} />
+        <MiniInsightCard title="90일 저점" text={formatWon(summary.low90d)} />
+        <MiniInsightCard title="고점 대비" text={`${summary.drawdownFromHigh}%`} />
+        <MiniInsightCard title="저점 대비" text={`${summary.reboundFromLow}%`} />
+        <MiniInsightCard title="누적 거래량" text={formatNumber(current.accumulatedVolume)} />
+        <MiniInsightCard title="누적 거래대금" text={formatAmountShort(current.accumulatedAmount)} />
+        <MiniInsightCard
+          title="20일 평균 대비 거래량"
+          text={
+            marketDiagnostics.volumeRatio
+              ? `${marketDiagnostics.volumeRatio.toFixed(2)}배`
+              : '-'
+          }
+        />
+      </div>
+    </div>
+  )
+}
+
+function MiniInsightCard({ title, text }) {
+  return (
+    <div style={miniInsightCardStyle}>
+      <strong style={{ display: 'block', fontSize: '12px', color: '#64748b' }}>{title}</strong>
+      <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#0f172a', lineHeight: 1.5 }}>
+        {text}
+      </p>
     </div>
   )
 }
@@ -1305,6 +1453,13 @@ const riskNeutralStyle = {
   background: '#f8fafc',
   color: '#334155',
   borderColor: 'rgba(148, 163, 184, 0.25)'
+}
+
+const miniInsightCardStyle = {
+  borderRadius: '14px',
+  padding: '12px',
+  background: 'white',
+  border: '1px solid rgba(148, 163, 184, 0.25)'
 }
 
 const safeNoticeStyle = {
