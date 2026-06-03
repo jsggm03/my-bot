@@ -1,191 +1,50 @@
-const STOCK_LIST = [
-  { name: '삼성전자', code: '005930', market: 'KOSPI', aliases: ['삼전'] },
-  { name: '삼성전자우', code: '005935', market: 'KOSPI', aliases: ['삼전우'] },
+let cachedToken = null
+let cachedTokenExpiresAt = 0
+
+const STOCKS = [
+  { name: '삼성전자', code: '005930', market: 'KOSPI', aliases: ['삼전', '삼성'] },
+  { name: '삼성전자우', code: '005935', market: 'KOSPI', aliases: ['삼성전자우선주', '삼전우'] },
   { name: 'SK하이닉스', code: '000660', market: 'KOSPI', aliases: ['하이닉스', 'sk하이닉스'] },
-  { name: 'LG에너지솔루션', code: '373220', market: 'KOSPI', aliases: ['LG엔솔', '엘지에너지솔루션'] },
-  { name: '삼성바이오로직스', code: '207940', market: 'KOSPI', aliases: ['삼바'] },
+  { name: 'LG에너지솔루션', code: '373220', market: 'KOSPI', aliases: ['엘지에너지솔루션', 'LG엔솔', '엘지엔솔'] },
+  { name: '삼성바이오로직스', code: '207940', market: 'KOSPI', aliases: ['삼바', '삼성바이오'] },
   { name: '현대차', code: '005380', market: 'KOSPI', aliases: ['현대자동차'] },
   { name: '기아', code: '000270', market: 'KOSPI', aliases: ['기아차'] },
-  { name: '셀트리온', code: '068270', market: 'KOSPI' },
-  { name: 'KB금융', code: '105560', market: 'KOSPI', aliases: ['KB금융지주'] },
-  { name: '신한지주', code: '055550', market: 'KOSPI' },
+  { name: '셀트리온', code: '068270', market: 'KOSPI', aliases: [] },
+  { name: 'NAVER', code: '035420', market: 'KOSPI', aliases: ['네이버', 'naver'] },
+  { name: '카카오', code: '035720', market: 'KOSPI', aliases: [] },
+  { name: '한미반도체', code: '042700', market: 'KOSPI', aliases: ['한미'] },
+  { name: '삼성물산', code: '028260', market: 'KOSPI', aliases: [] },
+  { name: '삼성SDI', code: '006400', market: 'KOSPI', aliases: ['삼성sdi'] },
+  { name: '삼성생명', code: '032830', market: 'KOSPI', aliases: [] },
+  { name: '삼성화재', code: '000810', market: 'KOSPI', aliases: [] },
+  { name: '삼성에스디에스', code: '018260', market: 'KOSPI', aliases: ['삼성SDS', '삼성sds'] },
+  { name: '삼성중공업', code: '010140', market: 'KOSPI', aliases: ['삼중'] },
+  { name: 'POSCO홀딩스', code: '005490', market: 'KOSPI', aliases: ['포스코홀딩스', '포스코'] },
+  { name: '포스코퓨처엠', code: '003670', market: 'KOSPI', aliases: ['포퓨엠'] },
+  { name: 'KB금융', code: '105560', market: 'KOSPI', aliases: ['kb금융'] },
+  { name: '신한지주', code: '055550', market: 'KOSPI', aliases: [] },
   { name: '하나금융지주', code: '086790', market: 'KOSPI', aliases: ['하나금융'] },
   { name: '우리금융지주', code: '316140', market: 'KOSPI', aliases: ['우리금융'] },
-  { name: '카카오', code: '035720', market: 'KOSPI' },
-  { name: 'NAVER', code: '035420', market: 'KOSPI', aliases: ['네이버'] },
-  { name: '삼성물산', code: '028260', market: 'KOSPI' },
-  { name: 'POSCO홀딩스', code: '005490', market: 'KOSPI', aliases: ['포스코홀딩스', '포스코'] },
-  { name: 'LG화학', code: '051910', market: 'KOSPI' },
-  { name: '삼성SDI', code: '006400', market: 'KOSPI' },
-  { name: '현대모비스', code: '012330', market: 'KOSPI' },
-  { name: 'LG전자', code: '066570', market: 'KOSPI' },
-  { name: '삼성생명', code: '032830', market: 'KOSPI' },
-  { name: '삼성화재', code: '000810', market: 'KOSPI' },
-  { name: '기업은행', code: '024110', market: 'KOSPI', aliases: ['IBK기업은행'] },
-  { name: 'KT&G', code: '033780', market: 'KOSPI', aliases: ['케이티앤지'] },
-  { name: 'KT', code: '030200', market: 'KOSPI', aliases: ['케이티'] },
-  { name: 'SK텔레콤', code: '017670', market: 'KOSPI', aliases: ['SKT', '에스케이텔레콤'] },
-  { name: 'LG유플러스', code: '032640', market: 'KOSPI', aliases: ['엘지유플러스'] },
-  { name: '한국전력', code: '015760', market: 'KOSPI', aliases: ['한전'] },
-  { name: '현대글로비스', code: '086280', market: 'KOSPI' },
-  { name: '삼성에스디에스', code: '018260', market: 'KOSPI', aliases: ['삼성SDS'] },
-  { name: '포스코퓨처엠', code: '003670', market: 'KOSPI' },
-  { name: '카카오뱅크', code: '323410', market: 'KOSPI' },
-  { name: '카카오페이', code: '377300', market: 'KOSPI' },
-  { name: '크래프톤', code: '259960', market: 'KOSPI' },
-  { name: '하이브', code: '352820', market: 'KOSPI', aliases: ['HYBE'] },
-  { name: '넷마블', code: '251270', market: 'KOSPI' },
-  { name: '엔씨소프트', code: '036570', market: 'KOSPI', aliases: ['NC소프트'] },
+  { name: 'LG화학', code: '051910', market: 'KOSPI', aliases: ['엘지화학'] },
+  { name: 'LG전자', code: '066570', market: 'KOSPI', aliases: ['엘지전자'] },
+  { name: '현대모비스', code: '012330', market: 'KOSPI', aliases: [] },
+  { name: '카카오뱅크', code: '323410', market: 'KOSPI', aliases: ['카뱅'] },
+  { name: '카카오페이', code: '377300', market: 'KOSPI', aliases: [] },
+  { name: '크래프톤', code: '259960', market: 'KOSPI', aliases: [] },
   { name: '두산에너빌리티', code: '034020', market: 'KOSPI', aliases: ['두산중공업'] },
-  { name: 'HD현대일렉트릭', code: '267260', market: 'KOSPI', aliases: ['현대일렉트릭'] },
-  { name: 'HD현대', code: '267250', market: 'KOSPI' },
-  { name: 'HD한국조선해양', code: '009540', market: 'KOSPI', aliases: ['한국조선해양'] },
-  { name: 'HD현대중공업', code: '329180', market: 'KOSPI', aliases: ['현대중공업'] },
-  { name: '삼성중공업', code: '010140', market: 'KOSPI' },
-  { name: '한화오션', code: '042660', market: 'KOSPI', aliases: ['대우조선해양'] },
-  { name: '한화에어로스페이스', code: '012450', market: 'KOSPI', aliases: ['한화에어로'] },
-  { name: 'LIG넥스원', code: '079550', market: 'KOSPI', aliases: ['엘아이지넥스원'] },
-  { name: '현대로템', code: '064350', market: 'KOSPI' },
-  { name: '한국항공우주', code: '047810', market: 'KOSPI', aliases: ['KAI'] },
-  { name: '한미반도체', code: '042700', market: 'KOSPI' },
-  { name: 'LS ELECTRIC', code: '010120', market: 'KOSPI', aliases: ['LS일렉트릭', '엘에스일렉트릭'] },
-  { name: 'LS', code: '006260', market: 'KOSPI' },
-  { name: '대한전선', code: '001440', market: 'KOSPI' },
-  { name: '효성중공업', code: '298040', market: 'KOSPI' },
-  { name: '두산로보틱스', code: '454910', market: 'KOSPI' },
-  { name: '두산밥캣', code: '241560', market: 'KOSPI' },
-  { name: '두산', code: '000150', market: 'KOSPI' },
-  { name: 'SK스퀘어', code: '402340', market: 'KOSPI' },
-  { name: 'SK이노베이션', code: '096770', market: 'KOSPI' },
-  { name: 'SK', code: '034730', market: 'KOSPI' },
-  { name: 'SK바이오팜', code: '326030', market: 'KOSPI' },
-  { name: 'SK바이오사이언스', code: '302440', market: 'KOSPI' },
-  { name: 'LG', code: '003550', market: 'KOSPI' },
-  { name: 'LG이노텍', code: '011070', market: 'KOSPI' },
-  { name: '롯데케미칼', code: '011170', market: 'KOSPI' },
-  { name: 'S-Oil', code: '010950', market: 'KOSPI', aliases: ['에쓰오일', '에스오일'] },
-  { name: 'GS', code: '078930', market: 'KOSPI' },
-  { name: 'GS건설', code: '006360', market: 'KOSPI' },
-  { name: '현대건설', code: '000720', market: 'KOSPI' },
-  { name: '대우건설', code: '047040', market: 'KOSPI' },
-  { name: 'HMM', code: '011200', market: 'KOSPI' },
-  { name: '대한항공', code: '003490', market: 'KOSPI' },
-  { name: '아시아나항공', code: '020560', market: 'KOSPI' },
-  { name: 'CJ제일제당', code: '097950', market: 'KOSPI' },
-  { name: 'CJ', code: '001040', market: 'KOSPI' },
-  { name: '오리온', code: '271560', market: 'KOSPI' },
-  { name: '농심', code: '004370', market: 'KOSPI' },
-  { name: '삼양식품', code: '003230', market: 'KOSPI' },
-  { name: 'BGF리테일', code: '282330', market: 'KOSPI' },
-  { name: '이마트', code: '139480', market: 'KOSPI' },
-  { name: '신세계', code: '004170', market: 'KOSPI' },
-  { name: '호텔신라', code: '008770', market: 'KOSPI' },
-  { name: '아모레퍼시픽', code: '090430', market: 'KOSPI' },
-  { name: 'LG생활건강', code: '051900', market: 'KOSPI', aliases: ['엘지생활건강'] },
-  { name: '유한양행', code: '000100', market: 'KOSPI' },
-  { name: '한미약품', code: '128940', market: 'KOSPI' },
-  { name: '녹십자', code: '006280', market: 'KOSPI', aliases: ['GC녹십자'] },
-  { name: '종근당', code: '185750', market: 'KOSPI' },
-  { name: '대웅제약', code: '069620', market: 'KOSPI' },
-  { name: '보령', code: '003850', market: 'KOSPI', aliases: ['보령제약'] },
-  { name: '한올바이오파마', code: '009420', market: 'KOSPI' },
-  { name: '현대백화점', code: '069960', market: 'KOSPI' },
-  { name: 'F&F', code: '383220', market: 'KOSPI', aliases: ['에프앤에프'] },
-  { name: '영원무역', code: '111770', market: 'KOSPI' },
-  { name: '코스맥스', code: '192820', market: 'KOSPI' },
-  { name: '한국콜마', code: '161890', market: 'KOSPI' },
-
-  { name: '에코프로비엠', code: '247540', market: 'KOSDAQ' },
-  { name: '에코프로', code: '086520', market: 'KOSDAQ' },
-  { name: '엘앤에프', code: '066970', market: 'KOSDAQ' },
-  { name: '천보', code: '278280', market: 'KOSDAQ' },
-  { name: '엔켐', code: '348370', market: 'KOSDAQ' },
-  { name: 'HLB', code: '028300', market: 'KOSDAQ' },
-  { name: '알테오젠', code: '196170', market: 'KOSDAQ' },
-  { name: '리가켐바이오', code: '141080', market: 'KOSDAQ', aliases: ['레고켐바이오'] },
-  { name: '삼천당제약', code: '000250', market: 'KOSDAQ' },
-  { name: '휴젤', code: '145020', market: 'KOSDAQ' },
-  { name: '메디톡스', code: '086900', market: 'KOSDAQ' },
-  { name: '오스코텍', code: '039200', market: 'KOSDAQ' },
-  { name: '셀트리온제약', code: '068760', market: 'KOSDAQ' },
-  { name: '펄어비스', code: '263750', market: 'KOSDAQ' },
-  { name: '카카오게임즈', code: '293490', market: 'KOSDAQ' },
-  { name: '위메이드', code: '112040', market: 'KOSDAQ' },
-  { name: '컴투스', code: '078340', market: 'KOSDAQ' },
-  { name: '디어유', code: '376300', market: 'KOSDAQ' },
-  { name: 'JYP Ent.', code: '035900', market: 'KOSDAQ', aliases: ['JYP', '제이와이피', '제이와이피엔터'] },
-  { name: '에스엠', code: '041510', market: 'KOSDAQ', aliases: ['SM', 'SM엔터', '에스엠엔터'] },
-  { name: '와이지엔터테인먼트', code: '122870', market: 'KOSDAQ', aliases: ['YG', 'YG엔터'] },
-  { name: '스튜디오드래곤', code: '253450', market: 'KOSDAQ' },
-  { name: 'CJ ENM', code: '035760', market: 'KOSDAQ', aliases: ['씨제이이엔엠'] },
-  { name: '리노공업', code: '058470', market: 'KOSDAQ' },
-  { name: 'ISC', code: '095340', market: 'KOSDAQ' },
-  { name: 'HPSP', code: '403870', market: 'KOSDAQ' },
-  { name: '동진쎄미켐', code: '005290', market: 'KOSDAQ' },
-  { name: '솔브레인', code: '357780', market: 'KOSDAQ' },
-  { name: '주성엔지니어링', code: '036930', market: 'KOSDAQ' },
-  { name: '원익IPS', code: '240810', market: 'KOSDAQ' },
-  { name: '심텍', code: '222800', market: 'KOSDAQ' },
-  { name: '대주전자재료', code: '078600', market: 'KOSDAQ' },
-  { name: '나노신소재', code: '121600', market: 'KOSDAQ' },
-  { name: '하나마이크론', code: '067310', market: 'KOSDAQ' },
-  { name: '제주반도체', code: '080220', market: 'KOSDAQ' },
-  { name: '가온칩스', code: '399720', market: 'KOSDAQ' },
-  { name: '칩스앤미디어', code: '094360', market: 'KOSDAQ' },
-  { name: '루닛', code: '328130', market: 'KOSDAQ' },
-  { name: '뷰노', code: '338220', market: 'KOSDAQ' },
-  { name: '레인보우로보틱스', code: '277810', market: 'KOSDAQ' },
-  { name: '로보티즈', code: '108490', market: 'KOSDAQ' },
-  { name: '에스피지', code: '058610', market: 'KOSDAQ' },
-  { name: '클래시스', code: '214150', market: 'KOSDAQ' },
-  { name: '파마리서치', code: '214450', market: 'KOSDAQ' },
-  { name: '케어젠', code: '214370', market: 'KOSDAQ' },
-  { name: '신성델타테크', code: '065350', market: 'KOSDAQ' },
-  { name: '서진시스템', code: '178320', market: 'KOSDAQ' }
+  { name: '에코프로', code: '086520', market: 'KOSDAQ', aliases: [] },
+  { name: '에코프로비엠', code: '247540', market: 'KOSDAQ', aliases: ['에코비엠'] },
+  { name: 'HLB', code: '028300', market: 'KOSDAQ', aliases: ['에이치엘비'] },
+  { name: '알테오젠', code: '196170', market: 'KOSDAQ', aliases: [] },
+  { name: '리노공업', code: '058470', market: 'KOSDAQ', aliases: [] },
+  { name: 'JYP Ent.', code: '035900', market: 'KOSDAQ', aliases: ['JYP', '제이와이피'] },
+  { name: '에스엠', code: '041510', market: 'KOSDAQ', aliases: ['SM', 'sm'] },
+  { name: '와이지엔터테인먼트', code: '122870', market: 'KOSDAQ', aliases: ['YG', '와이지'] }
 ]
 
-let cachedToken = null
-let tokenExpiresAt = 0
-
-function normalizeText(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '')
-    .replace(/[().·_\-]/g, '')
-}
-
-function getSearchNames(stock) {
-  return [stock.name, stock.code, ...(stock.aliases || [])].map(normalizeText)
-}
-
-function searchStock(name) {
-  const keyword = normalizeText(name)
-  if (!keyword) return { type: 'none', candidates: [] }
-
-  const exactMatches = STOCK_LIST.filter((stock) => getSearchNames(stock).includes(keyword))
-
-  if (exactMatches.length === 1) {
-    return { type: 'exact', stock: exactMatches[0], candidates: [] }
-  }
-
-  if (exactMatches.length > 1) {
-    return { type: 'ambiguous', candidates: exactMatches.slice(0, 12) }
-  }
-
-  const partialMatches = STOCK_LIST.filter((stock) =>
-    getSearchNames(stock).some((n) => n.includes(keyword) || keyword.includes(n))
-  )
-
-  if (partialMatches.length === 1) {
-    return { type: 'exact', stock: partialMatches[0], candidates: [] }
-  }
-
-  if (partialMatches.length > 1) {
-    return { type: 'ambiguous', candidates: partialMatches.slice(0, 12) }
-  }
-
-  return { type: 'none', candidates: [] }
+function toNumber(value) {
+  const n = Number(String(value ?? '').replace(/,/g, '').trim())
+  return Number.isFinite(n) ? n : 0
 }
 
 function formatDate(date) {
@@ -195,195 +54,69 @@ function formatDate(date) {
   return `${y}${m}${d}`
 }
 
-function toNumber(value) {
-  const n = Number(String(value || '').replaceAll(',', ''))
-  return Number.isFinite(n) ? n : 0
+function percentChange(from, to) {
+  const a = Number(from)
+  const b = Number(to)
+
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a === 0) return null
+  return Number((((b - a) / a) * 100).toFixed(2))
 }
 
-function pickNumber(row, keys) {
-  for (const key of keys) {
-    const value = row?.[key]
-
-    if (value !== undefined && value !== null && value !== '') {
-      return toNumber(value)
-    }
-  }
-
-  return null
+function avg(values) {
+  const nums = values.filter((v) => Number.isFinite(v))
+  if (!nums.length) return null
+  return Number((nums.reduce((sum, v) => sum + v, 0) / nums.length).toFixed(2))
 }
 
-function normalizeActorFromRaw(row, prefix) {
-  return {
-    buyQty: pickNumber(row, [`${prefix}_shnu_vol`]),
-    sellQty: pickNumber(row, [`${prefix}_seln_vol`]),
-    netQty: pickNumber(row, [`${prefix}_ntby_qty`]),
-    buyAmount: pickNumber(row, [`${prefix}_shnu_tr_pbmn`]),
-    sellAmount: pickNumber(row, [`${prefix}_seln_tr_pbmn`]),
-    netAmount: pickNumber(row, [`${prefix}_ntby_tr_pbmn`])
-  }
+function normalizeName(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[().·]/g, '')
 }
 
-function sumActors(rows, prefix) {
-  const result = {
-    buyQty: 0,
-    sellQty: 0,
-    netQty: 0,
-    buyAmount: 0,
-    sellAmount: 0,
-    netAmount: 0
-  }
+function findStock(query) {
+  const q = normalizeName(query)
 
-  let hasAny = false
+  if (!q) return { type: 'none' }
 
-  for (const row of rows) {
-    const actor = normalizeActorFromRaw(row, prefix)
+  const byCode = STOCKS.find((stock) => stock.code === query)
+  if (byCode) return { type: 'exact', stock: byCode }
 
-    for (const key of Object.keys(result)) {
-      if (actor[key] !== null && Number.isFinite(actor[key])) {
-        result[key] += actor[key]
-        hasAny = true
-      }
-    }
-  }
-
-  if (!hasAny) {
-    return {
-      buyQty: null,
-      sellQty: null,
-      netQty: null,
-      buyAmount: null,
-      sellAmount: null,
-      netAmount: null
-    }
-  }
-
-  return result
-}
-
-function buildFlowSignal({ individualNet, foreignNet, institutionNet }) {
-  if (individualNet > 0 && foreignNet < 0 && institutionNet < 0) {
-    return '개인 매수 쏠림 가능성'
-  }
-
-  if (individualNet < 0 && foreignNet > 0 && institutionNet > 0) {
-    return '외국인·기관 동반 매수 가능성'
-  }
-
-  if (foreignNet > 0 && institutionNet > 0) {
-    return '외국인·기관 수급 우호'
-  }
-
-  if (foreignNet < 0 && institutionNet < 0) {
-    return '외국인·기관 동반 매도 주의'
-  }
-
-  if (
-    individualNet !== null ||
-    foreignNet !== null ||
-    institutionNet !== null
-  ) {
-    return '수급 혼조'
-  }
-
-  return '수급 데이터 확인 필요'
-}
-
-function buildFlowSummaryFromRows(rows) {
-  const latest = rows[0] || null
-
-  const latestSummary = latest
-    ? {
-        individual: normalizeActorFromRaw(latest, 'prsn'),
-        foreign: normalizeActorFromRaw(latest, 'frgn'),
-        institution: normalizeActorFromRaw(latest, 'orgn')
-      }
-    : {
-        individual: {
-          buyQty: null,
-          sellQty: null,
-          netQty: null,
-          buyAmount: null,
-          sellAmount: null,
-          netAmount: null
-        },
-        foreign: {
-          buyQty: null,
-          sellQty: null,
-          netQty: null,
-          buyAmount: null,
-          sellAmount: null,
-          netAmount: null
-        },
-        institution: {
-          buyQty: null,
-          sellQty: null,
-          netQty: null,
-          buyAmount: null,
-          sellAmount: null,
-          netAmount: null
-        }
-      }
-
-  const recent5 = rows.slice(0, 5)
-  const recent20 = rows.slice(0, 20)
-
-  const recent5Summary = {
-    individual: sumActors(recent5, 'prsn'),
-    foreign: sumActors(recent5, 'frgn'),
-    institution: sumActors(recent5, 'orgn')
-  }
-
-  const recent20Summary = {
-    individual: sumActors(recent20, 'prsn'),
-    foreign: sumActors(recent20, 'frgn'),
-    institution: sumActors(recent20, 'orgn')
-  }
-
-  const individualNet = latestSummary.individual.netQty
-  const foreignNet = latestSummary.foreign.netQty
-  const institutionNet = latestSummary.institution.netQty
-
-  const signal = buildFlowSignal({
-    individualNet,
-    foreignNet,
-    institutionNet
+  const exact = STOCKS.find((stock) => {
+    const names = [stock.name, ...(stock.aliases || [])].map(normalizeName)
+    return names.includes(q)
   })
 
-  return {
-    latestDate: latest?.stck_bsop_date || '',
+  if (exact) return { type: 'exact', stock: exact }
 
-    // 기존 StockGuardPanel 호환용
-    individual: latestSummary.individual,
-    foreign: latestSummary.foreign,
-    institution: latestSummary.institution,
-    signal,
+  const candidates = STOCKS.filter((stock) => {
+    const names = [stock.name, ...(stock.aliases || [])].map(normalizeName)
+    return names.some((name) => name.includes(q) || q.includes(name))
+  }).slice(0, 10)
 
-    // 새 구조
-    latest: latestSummary,
-    recent5: recent5Summary,
-    recent20: recent20Summary
+  if (candidates.length === 1) {
+    return { type: 'exact', stock: candidates[0] }
   }
+
+  if (candidates.length > 1) {
+    return { type: 'ambiguous', candidates }
+  }
+
+  return { type: 'none' }
 }
 
-async function getKisToken() {
+async function getKisToken({ baseUrl, appkey, appsecret }) {
   const now = Date.now()
 
-  if (cachedToken && now < tokenExpiresAt) {
+  if (cachedToken && cachedTokenExpiresAt > now + 60_000) {
     return cachedToken
-  }
-
-  const appkey = process.env.KIS_APP_KEY
-  const appsecret = process.env.KIS_APP_SECRET
-  const baseUrl = process.env.KIS_BASE_URL || 'https://openapi.koreainvestment.com:9443'
-
-  if (!appkey || !appsecret) {
-    throw new Error('KIS_APP_KEY 또는 KIS_APP_SECRET 환경변수가 없습니다.')
   }
 
   const response = await fetch(`${baseUrl}/oauth2/tokenP`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json; charset=utf-8'
+      'content-type': 'application/json; charset=utf-8'
     },
     body: JSON.stringify({
       grant_type: 'client_credentials',
@@ -398,17 +131,15 @@ async function getKisToken() {
   try {
     data = JSON.parse(text)
   } catch {
-    throw new Error(`한국투자증권 토큰 응답 파싱 실패: ${text}`)
+    throw new Error(`토큰 응답 파싱 실패: ${text}`)
   }
 
   if (!response.ok || !data.access_token) {
-    throw new Error(`한국투자증권 토큰 발급 실패: ${text}`)
+    throw new Error(data.msg1 || data.error_description || `토큰 발급 실패: ${text}`)
   }
 
   cachedToken = data.access_token
-
-  const expiresInSec = Number(data.expires_in || 86400)
-  tokenExpiresAt = now + Math.max(expiresInSec - 300, 60) * 1000
+  cachedTokenExpiresAt = now + Number(data.expires_in || 86400) * 1000
 
   return cachedToken
 }
@@ -458,6 +189,407 @@ async function fetchCurrentPrice({ baseUrl, token, appkey, appsecret, stockCode 
   }
 }
 
+async function fetchDailyPrices({ baseUrl, token, appkey, appsecret, stockCode, days = 100 }) {
+  const today = new Date()
+  const start = new Date()
+  start.setDate(today.getDate() - days)
+
+  const params = new URLSearchParams({
+    FID_COND_MRKT_DIV_CODE: 'J',
+    FID_INPUT_ISCD: stockCode,
+    FID_INPUT_DATE_1: formatDate(start),
+    FID_INPUT_DATE_2: formatDate(today),
+    FID_PERIOD_DIV_CODE: 'D',
+    FID_ORG_ADJ_PRC: '0'
+  })
+
+  const response = await fetch(
+    `${baseUrl}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice?${params}`,
+    {
+      method: 'GET',
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        authorization: `Bearer ${token}`,
+        appkey,
+        appsecret,
+        tr_id: 'FHKST03010100',
+        custtype: 'P'
+      }
+    }
+  )
+
+  const text = await response.text()
+  let data = null
+
+  try {
+    data = JSON.parse(text)
+  } catch {
+    throw new Error(`일봉 응답 파싱 실패: ${text}`)
+  }
+
+  if (!response.ok || data.rt_cd !== '0') {
+    throw new Error(data.msg1 || `일봉 조회 실패: ${text}`)
+  }
+
+  const rows = Array.isArray(data.output2) ? data.output2 : []
+
+  return rows
+    .map((row) => ({
+      date: row.stck_bsop_date,
+      open: toNumber(row.stck_oprc),
+      high: toNumber(row.stck_hgpr),
+      low: toNumber(row.stck_lwpr),
+      close: toNumber(row.stck_clpr),
+      volume: toNumber(row.acml_vol)
+    }))
+    .filter((row) => row.date && row.close > 0)
+    .sort((a, b) => a.date.localeCompare(b.date))
+}
+
+async function fetchLongDailyPrices({ baseUrl, token, appkey, appsecret, stockCode }) {
+  const today = new Date()
+  const allPrices = []
+  const chunkCount = 12
+
+  for (let i = 0; i < chunkCount; i += 1) {
+    const end = new Date(today)
+    end.setDate(today.getDate() - i * 100)
+
+    const start = new Date(end)
+    start.setDate(end.getDate() - 100)
+
+    const params = new URLSearchParams({
+      FID_COND_MRKT_DIV_CODE: 'J',
+      FID_INPUT_ISCD: stockCode,
+      FID_INPUT_DATE_1: formatDate(start),
+      FID_INPUT_DATE_2: formatDate(end),
+      FID_PERIOD_DIV_CODE: 'D',
+      FID_ORG_ADJ_PRC: '0'
+    })
+
+    const response = await fetch(
+      `${baseUrl}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice?${params}`,
+      {
+        method: 'GET',
+        headers: {
+          'content-type': 'application/json; charset=utf-8',
+          authorization: `Bearer ${token}`,
+          appkey,
+          appsecret,
+          tr_id: 'FHKST03010100',
+          custtype: 'P'
+        }
+      }
+    )
+
+    const text = await response.text()
+    let data = null
+
+    try {
+      data = JSON.parse(text)
+    } catch {
+      throw new Error(`장기 일봉 응답 파싱 실패: ${text}`)
+    }
+
+    if (!response.ok || data.rt_cd !== '0') {
+      throw new Error(data.msg1 || `장기 일봉 조회 실패: ${text}`)
+    }
+
+    const rows = Array.isArray(data.output2) ? data.output2 : []
+
+    const prices = rows
+      .map((row) => ({
+        date: row.stck_bsop_date,
+        open: toNumber(row.stck_oprc),
+        high: toNumber(row.stck_hgpr),
+        low: toNumber(row.stck_lwpr),
+        close: toNumber(row.stck_clpr),
+        volume: toNumber(row.acml_vol)
+      }))
+      .filter((row) => row.date && row.close > 0)
+
+    allPrices.push(...prices)
+
+    await new Promise((resolve) => setTimeout(resolve, 80))
+  }
+
+  const uniqueMap = new Map()
+
+  allPrices.forEach((row) => {
+    uniqueMap.set(row.date, row)
+  })
+
+  return Array.from(uniqueMap.values()).sort((a, b) => a.date.localeCompare(b.date))
+}
+
+function makeSummary(prices, currentPrice) {
+  const sorted = [...prices].sort((a, b) => a.date.localeCompare(b.date))
+  const latest = sorted[sorted.length - 1]
+
+  const close = Number(currentPrice || latest?.close || 0)
+  const recent5 = sorted.slice(-5)
+  const recent20 = sorted.slice(-20)
+  const recent90 = sorted.slice(-90)
+
+  const high90d = Math.max(...recent90.map((row) => row.high || row.close))
+  const low90d = Math.min(...recent90.map((row) => row.low || row.close))
+
+  return {
+    currentPrice: close,
+    change5d:
+      recent5.length >= 2 ? percentChange(recent5[0].close, close) : null,
+    change20d:
+      recent20.length >= 2 ? percentChange(recent20[0].close, close) : null,
+    high90d,
+    low90d,
+    drawdownFromHigh: percentChange(high90d, close),
+    reboundFromLow: percentChange(low90d, close)
+  }
+}
+
+function maxDrawdownAfter(prices, startIndex, days) {
+  const base = prices[startIndex]?.close
+  if (!base) return null
+
+  const future = prices.slice(startIndex + 1, startIndex + 1 + days)
+  if (!future.length) return null
+
+  const minLow = Math.min(...future.map((row) => row.low || row.close))
+  return Number((((minLow - base) / base) * 100).toFixed(2))
+}
+
+function calculateRollingSignal(prices, index) {
+  const current = prices[index]
+  if (!current || index < 90) return null
+
+  const recent90 = prices.slice(index - 89, index + 1)
+  const recent20 = prices.slice(index - 19, index + 1)
+  const recent5 = prices.slice(index - 4, index + 1)
+
+  if (recent90.length < 90 || recent20.length < 20 || recent5.length < 5) return null
+
+  const high90 = Math.max(...recent90.map((row) => row.high || row.close))
+  const low90 = Math.min(...recent90.map((row) => row.low || row.close))
+
+  const change5d = percentChange(recent5[0].close, current.close)
+  const change20d = percentChange(recent20[0].close, current.close)
+  const drawdownFromHigh = percentChange(high90, current.close)
+  const reboundFromLow = percentChange(low90, current.close)
+
+  const avgVolume20 =
+    recent20.reduce((sum, row) => sum + Number(row.volume || 0), 0) / recent20.length
+
+  const volumeRatio = avgVolume20 > 0 ? Number((current.volume / avgVolume20).toFixed(2)) : null
+
+  return {
+    date: current.date,
+    close: current.close,
+    change5d,
+    change20d,
+    drawdownFromHigh,
+    reboundFromLow,
+    volumeRatio
+  }
+}
+
+function analyzeSimilarHistory(longPrices, currentSummary) {
+  if (!Array.isArray(longPrices) || longPrices.length < 160 || !currentSummary) {
+    return {
+      available: false,
+      reason: '장기 일봉 데이터가 부족해 과거 유사 구간을 계산할 수 없습니다.'
+    }
+  }
+
+  const currentCondition = {
+    drawdownFromHigh: Number(currentSummary.drawdownFromHigh),
+    change20d: Number(currentSummary.change20d),
+    change5d: Number(currentSummary.change5d)
+  }
+
+  if (
+    !Number.isFinite(currentCondition.drawdownFromHigh) ||
+    !Number.isFinite(currentCondition.change20d) ||
+    !Number.isFinite(currentCondition.change5d)
+  ) {
+    return {
+      available: false,
+      reason: '현재 구간 조건이 부족해 과거 유사 구간을 계산할 수 없습니다.'
+    }
+  }
+
+  const similarRows = []
+
+  for (let i = 90; i < longPrices.length - 60; i += 1) {
+    const signal = calculateRollingSignal(longPrices, i)
+    if (!signal) continue
+
+    const drawdownSimilar =
+      signal.drawdownFromHigh <= currentCondition.drawdownFromHigh + 5 &&
+      signal.drawdownFromHigh >= currentCondition.drawdownFromHigh - 8
+
+    const trendSimilar =
+      Math.sign(signal.change20d) === Math.sign(currentCondition.change20d) ||
+      Math.abs(signal.change20d - currentCondition.change20d) <= 5
+
+    const reboundSimilar =
+      Math.sign(signal.change5d) === Math.sign(currentCondition.change5d) ||
+      Math.abs(signal.change5d - currentCondition.change5d) <= 3
+
+    if (!drawdownSimilar || !trendSimilar || !reboundSimilar) continue
+
+    const base = longPrices[i]
+    const after20 = longPrices[i + 20]
+    const after60 = longPrices[i + 60]
+
+    similarRows.push({
+      date: signal.date,
+      close: signal.close,
+      condition: {
+        change5d: signal.change5d,
+        change20d: signal.change20d,
+        drawdownFromHigh: signal.drawdownFromHigh,
+        reboundFromLow: signal.reboundFromLow,
+        volumeRatio: signal.volumeRatio
+      },
+      after: {
+        return20d: after20 ? percentChange(base.close, after20.close) : null,
+        return60d: after60 ? percentChange(base.close, after60.close) : null,
+        extraDrawdown20d: maxDrawdownAfter(longPrices, i, 20),
+        extraDrawdown60d: maxDrawdownAfter(longPrices, i, 60)
+      }
+    })
+  }
+
+  const deduped = []
+  let lastIndexDate = ''
+
+  similarRows.forEach((row) => {
+    if (!lastIndexDate) {
+      deduped.push(row)
+      lastIndexDate = row.date
+      return
+    }
+
+    const prev = new Date(
+      `${lastIndexDate.slice(0, 4)}-${lastIndexDate.slice(4, 6)}-${lastIndexDate.slice(6, 8)}`
+    )
+    const cur = new Date(`${row.date.slice(0, 4)}-${row.date.slice(4, 6)}-${row.date.slice(6, 8)}`)
+    const diffDays = Math.abs((cur - prev) / (1000 * 60 * 60 * 24))
+
+    if (diffDays >= 10) {
+      deduped.push(row)
+      lastIndexDate = row.date
+    }
+  })
+
+  const cases = deduped.slice(-12)
+
+  const returns20 = cases.map((row) => row.after.return20d).filter((v) => Number.isFinite(v))
+  const returns60 = cases.map((row) => row.after.return60d).filter((v) => Number.isFinite(v))
+  const drawdowns20 = cases.map((row) => row.after.extraDrawdown20d).filter((v) => Number.isFinite(v))
+  const drawdowns60 = cases.map((row) => row.after.extraDrawdown60d).filter((v) => Number.isFinite(v))
+
+  const up20 = returns20.filter((v) => v > 0).length
+  const down20 = returns20.filter((v) => v < 0).length
+  const up60 = returns60.filter((v) => v > 0).length
+  const down60 = returns60.filter((v) => v < 0).length
+
+  return {
+    available: true,
+    sampleCount: cases.length,
+    conditionText: `고점 대비 ${currentSummary.drawdownFromHigh}% 수준, 최근 20거래일 ${currentSummary.change20d}%, 최근 5거래일 ${currentSummary.change5d}%와 유사한 구간`,
+    summary: {
+      up20,
+      down20,
+      flat20: Math.max(returns20.length - up20 - down20, 0),
+      avgReturn20d: avg(returns20),
+      maxExtraDrawdown20d: drawdowns20.length ? Math.min(...drawdowns20) : null,
+      up60,
+      down60,
+      flat60: Math.max(returns60.length - up60 - down60, 0),
+      avgReturn60d: avg(returns60),
+      maxExtraDrawdown60d: drawdowns60.length ? Math.min(...drawdowns60) : null
+    },
+    cases
+  }
+}
+
+function normalizeFlowRow(row) {
+  const individual = toNumber(
+    row.prsn_ntby_qty ??
+      row.indv_ntby_qty ??
+      row.prsn_ntby_vol ??
+      row.prsn_seln_qty ??
+      0
+  )
+
+  const foreign = toNumber(
+    row.frgn_ntby_qty ??
+      row.frgn_ntby_vol ??
+      row.frgn_seln_qty ??
+      0
+  )
+
+  const institution = toNumber(
+    row.orgn_ntby_qty ??
+      row.inst_ntby_qty ??
+      row.orgn_ntby_vol ??
+      row.inst_seln_qty ??
+      0
+  )
+
+  return {
+    date: row.stck_bsop_date || row.bsop_date || row.date || '',
+    individual: { netQty: individual },
+    foreign: { netQty: foreign },
+    institution: { netQty: institution }
+  }
+}
+
+function sumFlow(rows) {
+  return rows.reduce(
+    (acc, row) => {
+      acc.individual.netQty += Number(row.individual?.netQty || 0)
+      acc.foreign.netQty += Number(row.foreign?.netQty || 0)
+      acc.institution.netQty += Number(row.institution?.netQty || 0)
+      return acc
+    },
+    {
+      individual: { netQty: 0 },
+      foreign: { netQty: 0 },
+      institution: { netQty: 0 }
+    }
+  )
+}
+
+function buildFlowSignal(period) {
+  const individual = Number(period?.individual?.netQty)
+  const foreign = Number(period?.foreign?.netQty)
+  const institution = Number(period?.institution?.netQty)
+
+  if (!Number.isFinite(individual) || !Number.isFinite(foreign) || !Number.isFinite(institution)) {
+    return '수급 데이터 확인 필요'
+  }
+
+  if (individual > 0 && foreign < 0 && institution < 0) {
+    return '개인 순매수 우위, 외국인·기관 순매도'
+  }
+
+  if (individual < 0 && foreign > 0 && institution > 0) {
+    return '외국인·기관 순매수 우위, 개인 순매도'
+  }
+
+  if (foreign > 0 && institution > 0) {
+    return '외국인·기관 동반 매수 가능성'
+  }
+
+  if (foreign < 0 && institution < 0) {
+    return '외국인·기관 동반 순매도 주의'
+  }
+
+  return '수급 혼조'
+}
+
 async function fetchInvestorFlow({ baseUrl, token, appkey, appsecret, stockCode }) {
   const params = new URLSearchParams({
     FID_COND_MRKT_DIV_CODE: 'J',
@@ -492,149 +624,80 @@ async function fetchInvestorFlow({ baseUrl, token, appkey, appsecret, stockCode 
     throw new Error(data.msg1 || `수급 조회 실패: ${text}`)
   }
 
-  const rows = Array.isArray(data.output)
-    ? data.output
-    : Array.isArray(data.output1)
-      ? data.output1
-      : Array.isArray(data.output2)
-        ? data.output2
-        : []
+  const rawRows = Array.isArray(data.output) ? data.output : Array.isArray(data.output2) ? data.output2 : []
+  const rows = rawRows.map(normalizeFlowRow).filter((row) => row.date)
+
+  const latest = rows[0] || rows[rows.length - 1] || null
+  const recentAsc = [...rows].sort((a, b) => a.date.localeCompare(b.date))
+
+  const recent5 = sumFlow(recentAsc.slice(-5))
+  const recent20 = sumFlow(recentAsc.slice(-20))
+
+  const baseLatest = latest || {
+    individual: { netQty: 0 },
+    foreign: { netQty: 0 },
+    institution: { netQty: 0 }
+  }
 
   return {
-    source: 'KIS 주식현재가 투자자',
-    fetchedAt: new Date().toISOString(),
     rows,
-    summary: buildFlowSummaryFromRows(rows),
-    raw: data.output || data.output1 || data.output2 || null
-  }
-}
-
-async function fetchDailyPrices({ baseUrl, token, appkey, appsecret, stockCode }) {
-  const today = new Date()
-  const start = new Date()
-  start.setDate(today.getDate() - 90)
-
-  const params = new URLSearchParams({
-    FID_COND_MRKT_DIV_CODE: 'J',
-    FID_INPUT_ISCD: stockCode,
-    FID_INPUT_DATE_1: formatDate(start),
-    FID_INPUT_DATE_2: formatDate(today),
-    FID_PERIOD_DIV_CODE: 'D',
-    FID_ORG_ADJ_PRC: '0'
-  })
-
-  const response = await fetch(
-    `${baseUrl}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice?${params}`,
-    {
-      method: 'GET',
-      headers: {
-        'content-type': 'application/json; charset=utf-8',
-        authorization: `Bearer ${token}`,
-        appkey,
-        appsecret,
-        tr_id: 'FHKST03010100',
-        custtype: 'P'
-      }
+    summary: {
+      latestDate: latest?.date || '',
+      latest: baseLatest,
+      individual: baseLatest.individual,
+      foreign: baseLatest.foreign,
+      institution: baseLatest.institution,
+      recent5,
+      recent20,
+      signal: buildFlowSignal(baseLatest)
     }
-  )
-
-  const text = await response.text()
-  let data = null
-
-  try {
-    data = JSON.parse(text)
-  } catch {
-    throw new Error(`기간별 시세 응답 파싱 실패: ${text}`)
-  }
-
-  if (!response.ok || data.rt_cd !== '0') {
-    throw new Error(data.msg1 || `기간별 시세 조회 실패: ${text}`)
-  }
-
-  return (data.output2 || [])
-    .map((row) => ({
-      date: row.stck_bsop_date,
-      open: toNumber(row.stck_oprc),
-      high: toNumber(row.stck_hgpr),
-      low: toNumber(row.stck_lwpr),
-      close: toNumber(row.stck_clpr),
-      volume: toNumber(row.acml_vol)
-    }))
-    .filter((row) => row.date && row.close > 0)
-    .sort((a, b) => a.date.localeCompare(b.date))
-}
-
-function calcChange(prices, days) {
-  if (!prices || prices.length < 2) return 0
-
-  const last = prices[prices.length - 1]
-  const prevIndex = Math.max(0, prices.length - 1 - days)
-  const prev = prices[prevIndex]
-
-  if (!prev?.close) return 0
-
-  return Number((((last.close - prev.close) / prev.close) * 100).toFixed(2))
-}
-
-function summarizePrices(prices, currentPrice) {
-  const closes = prices.map((p) => p.close).filter(Boolean)
-  const high = closes.length ? Math.max(...closes, currentPrice) : currentPrice
-  const low = closes.length ? Math.min(...closes, currentPrice) : currentPrice
-
-  return {
-    currentPrice,
-    change5d: calcChange(prices, 5),
-    change20d: calcChange(prices, 20),
-    high90d: high,
-    low90d: low,
-    drawdownFromHigh:
-      high > 0 ? Number((((currentPrice - high) / high) * 100).toFixed(2)) : 0,
-    reboundFromLow:
-      low > 0 ? Number((((currentPrice - low) / low) * 100).toFixed(2)) : 0
   }
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300')
-
-  if (req.method !== 'GET') {
-    return res.status(405).json({
-      success: false,
-      error: 'method_not_allowed'
-    })
-  }
-
   try {
-    const name = String(req.query?.name || '')
-    const searchResult = searchStock(name)
+    if (req.method !== 'GET') {
+      return res.status(405).json({ success: false, message: 'GET만 지원합니다.' })
+    }
 
-    if (searchResult.type === 'ambiguous') {
+    const name = String(req.query.name || '').trim()
+
+    const resolved = findStock(name)
+
+    if (resolved.type === 'ambiguous') {
       return res.status(200).json({
         success: false,
         error: 'ambiguous_stock',
-        message: '여러 종목이 검색되었습니다. 원하는 종목을 선택해 주세요.',
-        candidates: searchResult.candidates.map((stock) => ({
-          name: stock.name,
-          code: stock.code,
-          market: stock.market
-        }))
+        message: '종목을 하나로 특정할 수 없습니다.',
+        candidates: resolved.candidates
       })
     }
 
-    const stock = searchResult.stock
-
-    if (!stock) {
+    if (resolved.type !== 'exact') {
       return res.status(404).json({
         success: false,
-        error: 'stock_not_found',
-        message: '종목을 찾을 수 없습니다. 예: 카카오, 삼성전자, NAVER, 한미반도체'
+        message: '종목을 찾을 수 없습니다. 예: 카카오, 삼성전자, NAVER'
       })
     }
 
-    const appkey = process.env.KIS_APP_KEY
-    const appsecret = process.env.KIS_APP_SECRET
-    const baseUrl = process.env.KIS_BASE_URL || 'https://openapi.koreainvestment.com:9443'
-    const token = await getKisToken()
+    const stock = resolved.stock
+
+    const baseUrl =
+      process.env.KIS_BASE_URL ||
+      process.env.KOREA_INVESTMENT_BASE_URL ||
+      'https://openapi.koreainvestment.com:9443'
+
+    const appkey = process.env.KIS_APP_KEY || process.env.KOREA_INVESTMENT_APP_KEY
+    const appsecret = process.env.KIS_APP_SECRET || process.env.KOREA_INVESTMENT_APP_SECRET
+
+    if (!appkey || !appsecret) {
+      return res.status(500).json({
+        success: false,
+        message: '한국투자 API 키가 설정되지 않았습니다. KIS_APP_KEY, KIS_APP_SECRET 환경변수를 확인하세요.'
+      })
+    }
+
+    const token = await getKisToken({ baseUrl, appkey, appsecret })
 
     const current = await fetchCurrentPrice({
       baseUrl,
@@ -649,8 +712,11 @@ export default async function handler(req, res) {
       token,
       appkey,
       appsecret,
-      stockCode: stock.code
+      stockCode: stock.code,
+      days: 110
     })
+
+    const summary = makeSummary(prices, current.currentPrice)
 
     let flow = null
     let flowError = null
@@ -664,31 +730,43 @@ export default async function handler(req, res) {
         stockCode: stock.code
       })
     } catch (error) {
-      console.warn('investor flow api warning:', error)
-      flowError = error.message || '수급 데이터를 불러오지 못했습니다.'
+      flowError = error.message || '수급 데이터 조회 실패'
     }
 
-    const summary = summarizePrices(prices, current.currentPrice)
+    let longPrices = prices
+    let longPriceError = null
+
+    try {
+      longPrices = await fetchLongDailyPrices({
+        baseUrl,
+        token,
+        appkey,
+        appsecret,
+        stockCode: stock.code
+      })
+    } catch (error) {
+      longPriceError = error.message || '장기 일봉 조회 실패'
+    }
+
+    const similarHistory = analyzeSimilarHistory(longPrices, summary)
 
     return res.status(200).json({
       success: true,
-      stock: {
-        name: stock.name,
-        code: stock.code,
-        market: stock.market
-      },
+      stock,
       current,
       prices,
       summary,
       flow,
-      flowError
+      flowError,
+      longPriceCount: longPrices.length,
+      longPriceError,
+      similarHistory
     })
   } catch (error) {
-    console.error('stock api error:', error)
+    console.error('[api/stock]', error)
 
     return res.status(500).json({
       success: false,
-      error: 'stock_api_error',
       message: error.message || '주가 데이터를 불러오는 중 오류가 발생했습니다.'
     })
   }
