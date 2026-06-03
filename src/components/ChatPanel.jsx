@@ -1,5 +1,255 @@
 import { useEffect, useRef, useState } from 'react'
 
+const chatPanelCss = `
+.chatPanelRoot {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  background: #fffdf8;
+  overflow: hidden;
+}
+
+.chatPanelHeader {
+  min-height: 58px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(120, 83, 45, 0.12);
+  background: #fffdf8;
+}
+
+.chatPanelTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #3b2a1c;
+  font-size: 15px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.chatPanelActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.chatPanelSmallButton,
+.chatPanelUserButton {
+  border: 1px solid rgba(160, 128, 96, 0.28);
+  border-radius: 9px;
+  background: #fffaf3;
+  color: #5b3d25;
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chatPanelUserButton {
+  border-color: transparent;
+  background: transparent;
+  font-weight: 800;
+}
+
+.chatPanelBody {
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  padding: 20px 18px;
+  background: #fffdf8;
+}
+
+.chatPanelEmpty {
+  height: 100%;
+  min-height: 180px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  color: #b8a38e;
+  font-size: 14px;
+  line-height: 1.6;
+  padding-top: 8px;
+}
+
+.chatPanelMessage {
+  max-width: 88%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.65;
+  margin-bottom: 12px;
+  white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.chatPanelMessage.user {
+  margin-left: auto;
+  background: #3b2a1c;
+  color: #ffffff;
+  border-bottom-right-radius: 6px;
+}
+
+.chatPanelMessage.assistant {
+  margin-right: auto;
+  background: #fff7ed;
+  color: #3b2a1c;
+  border: 1px solid rgba(120, 83, 45, 0.12);
+  border-bottom-left-radius: 6px;
+}
+
+.chatPanelMessage.loading {
+  opacity: 0.75;
+}
+
+.chatPanelInputArea {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 36px;
+  gap: 10px;
+  align-items: center;
+  padding: 14px 18px 8px;
+  border-top: 1px solid rgba(120, 83, 45, 0.12);
+  background: #fffdf8;
+}
+
+.chatPanelMicButton {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #9a6b45;
+  box-shadow: inset 0 0 0 4px #fffdf8;
+  background: #0f172a;
+  cursor: pointer;
+  justify-self: center;
+}
+
+.chatPanelMicButton.on {
+  background: #ef4444;
+  border-color: #ef4444;
+  box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.14);
+}
+
+.chatPanelMicButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.chatPanelInput {
+  width: 100%;
+  min-height: 46px;
+  max-height: 120px;
+  resize: vertical;
+  border: 1px solid rgba(160, 128, 96, 0.2);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  outline: none;
+  color: #3b2a1c;
+  background: #fffaf3;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.chatPanelInput::placeholder {
+  color: #b8a38e;
+}
+
+.chatPanelSendButton {
+  border: 0;
+  background: transparent;
+  color: #3b2a1c;
+  font-size: 24px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.chatPanelSendButton:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.chatPanelHelpText {
+  text-align: center;
+  color: #8a6a4a;
+  font-size: 12px;
+  padding: 0 12px 12px;
+  background: #fffdf8;
+}
+
+@media (max-width: 900px) {
+  .chatPanelRoot {
+    height: 100dvh;
+    min-height: 640px;
+  }
+
+  .chatPanelBody {
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .chatPanelRoot {
+    height: 100dvh;
+    min-height: 640px;
+  }
+
+  .chatPanelHeader {
+    min-height: 58px;
+    padding: 0 12px;
+  }
+
+  .chatPanelActions {
+    gap: 6px;
+  }
+
+  .chatPanelSmallButton,
+  .chatPanelUserButton {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+
+  .chatPanelBody {
+    padding: 16px;
+  }
+
+  .chatPanelEmpty {
+    min-height: 260px;
+    align-items: flex-start;
+  }
+
+  .chatPanelMessage {
+    max-width: 94%;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .chatPanelInputArea {
+    grid-template-columns: 36px minmax(0, 1fr) 34px;
+    padding: 14px 16px 8px;
+  }
+
+  .chatPanelInput {
+    font-size: 14px;
+    min-height: 46px;
+  }
+
+  .chatPanelHelpText {
+    font-size: 11px;
+    padding-bottom: 14px;
+  }
+}
+`
+
 export default function ChatPanel({
   messages = [],
   isProcessing = false,
@@ -48,258 +298,7 @@ export default function ChatPanel({
 
   return (
     <>
-      <style>{`
-        .chatPanelRoot {
-          width: 100%;
-          height: 100%;
-          min-height: 0;
-          display: grid;
-          grid-template-rows: auto minmax(0, 1fr) auto auto;
-          background: #fffdf8;
-          overflow: hidden;
-        }
-
-        .chatPanelHeader {
-          min-height: 58px;
-          padding: 0 18px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          border-bottom: 1px solid rgba(120, 83, 45, 0.12);
-          background: #fffdf8;
-          flex: 0 0 auto;
-        }
-
-        .chatPanelTitle {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          color: #3b2a1c;
-          font-size: 15px;
-          font-weight: 900;
-          white-space: nowrap;
-        }
-
-        .chatPanelActions {
-          display: flex;
-          align-items: center;
-          justify-content: flex-end;
-          gap: 8px;
-          min-width: 0;
-          overflow-x: auto;
-        }
-
-        .chatPanelSmallButton,
-        .chatPanelUserButton {
-          border: 1px solid rgba(160, 128, 96, 0.28);
-          border-radius: 9px;
-          background: #fffaf3;
-          color: #5b3d25;
-          padding: 7px 10px;
-          font-size: 12px;
-          cursor: pointer;
-          white-space: nowrap;
-        }
-
-        .chatPanelUserButton {
-          border-color: transparent;
-          background: transparent;
-          font-weight: 800;
-        }
-
-        .chatPanelBody {
-          min-height: 0;
-          height: 100%;
-          overflow-y: auto;
-          padding: 20px 18px;
-          background: #fffdf8;
-        }
-
-        .chatPanelEmpty {
-          height: 100%;
-          min-height: 180px;
-          display: flex;
-          align-items: flex-start;
-          justify-content: flex-start;
-          color: #b8a38e;
-          font-size: 14px;
-          line-height: 1.6;
-          padding-top: 8px;
-        }
-
-        .chatPanelMessage {
-          max-width: 88%;
-          padding: 12px 14px;
-          border-radius: 16px;
-          font-size: 14px;
-          line-height: 1.65;
-          margin-bottom: 12px;
-          white-space: pre-wrap;
-          word-break: keep-all;
-          overflow-wrap: anywhere;
-        }
-
-        .chatPanelMessage.user {
-          margin-left: auto;
-          background: #3b2a1c;
-          color: #ffffff;
-          border-bottom-right-radius: 6px;
-        }
-
-        .chatPanelMessage.assistant {
-          margin-right: auto;
-          background: #fff7ed;
-          color: #3b2a1c;
-          border: 1px solid rgba(120, 83, 45, 0.12);
-          border-bottom-left-radius: 6px;
-        }
-
-        .chatPanelMessage.loading {
-          opacity: 0.75;
-        }
-
-        .chatPanelInputArea {
-          display: grid;
-          grid-template-columns: 34px minmax(0, 1fr) 36px;
-          gap: 10px;
-          align-items: center;
-          padding: 14px 18px 8px;
-          border-top: 1px solid rgba(120, 83, 45, 0.12);
-          background: #fffdf8;
-          flex: 0 0 auto;
-        }
-
-        .chatPanelMicButton {
-          width: 22px;
-          height: 22px;
-          border-radius: 50%;
-          border: 2px solid #9a6b45;
-          box-shadow: inset 0 0 0 4px #fffdf8;
-          background: #0f172a;
-          cursor: pointer;
-          justify-self: center;
-        }
-
-        .chatPanelMicButton.on {
-          background: #ef4444;
-          border-color: #ef4444;
-          box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.14);
-        }
-
-        .chatPanelMicButton:disabled {
-          cursor: not-allowed;
-          opacity: 0.45;
-        }
-
-        .chatPanelInput {
-          width: 100%;
-          min-height: 46px;
-          max-height: 120px;
-          resize: vertical;
-          border: 1px solid rgba(160, 128, 96, 0.2);
-          border-radius: 14px;
-          padding: 12px 14px;
-          font-size: 14px;
-          line-height: 1.5;
-          outline: none;
-          color: #3b2a1c;
-          background: #fffaf3;
-          box-sizing: border-box;
-          font-family: inherit;
-        }
-
-        .chatPanelInput::placeholder {
-          color: #b8a38e;
-        }
-
-        .chatPanelSendButton {
-          border: 0;
-          background: transparent;
-          color: #3b2a1c;
-          font-size: 24px;
-          cursor: pointer;
-          line-height: 1;
-        }
-
-        .chatPanelSendButton:disabled {
-          opacity: 0.35;
-          cursor: not-allowed;
-        }
-
-        .chatPanelHelpText {
-          text-align: center;
-          color: #8a6a4a;
-          font-size: 12px;
-          padding: 0 12px 12px;
-          background: #fffdf8;
-          flex: 0 0 auto;
-        }
-
-        @media (max-width: 900px) {
-          .chatPanelRoot {
-            height: 100dvh;
-            min-height: 640px;
-          }
-
-          .chatPanelBody {
-            min-height: 0;
-            overflow-y: auto;
-          }
-        }
-
-        @media (max-width: 640px) {
-          .chatPanelRoot {
-            height: 100dvh;
-            min-height: 640px;
-          }
-
-          .chatPanelHeader {
-            min-height: 58px;
-            padding: 0 12px;
-          }
-
-          .chatPanelActions {
-            gap: 6px;
-          }
-
-          .chatPanelSmallButton,
-          .chatPanelUserButton {
-            padding: 6px 8px;
-            font-size: 11px;
-          }
-
-          .chatPanelBody {
-            padding: 16px;
-          }
-
-          .chatPanelEmpty {
-            min-height: 260px;
-            align-items: flex-start;
-          }
-
-          .chatPanelMessage {
-            max-width: 94%;
-            font-size: 13px;
-            line-height: 1.55;
-          }
-
-          .chatPanelInputArea {
-            grid-template-columns: 36px minmax(0, 1fr) 34px;
-            padding: 14px 16px 8px;
-          }
-
-          .chatPanelInput {
-            font-size: 14px;
-            min-height: 46px;
-          }
-
-          .chatPanelHelpText {
-            font-size: 11px;
-            padding-bottom: 14px;
-          }
-        }
-      `}</style>
+      <style dangerouslySetInnerHTML={{ __html: chatPanelCss }} />
 
       <section className="chatPanelRoot">
         <header className="chatPanelHeader">
