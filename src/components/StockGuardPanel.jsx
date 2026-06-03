@@ -1223,6 +1223,18 @@ function DetailPanel({
   const flowError = stockData.flowError
   const flowSummary = flow?.summary
 
+  const formatDateLabel = (dateText) => {
+    const value = String(dateText || '')
+
+    if (value.length !== 8) return value || '기준일 정보 없음'
+
+    return `${value.slice(0, 4)}.${value.slice(4, 6)}.${value.slice(6, 8)} 기준`
+  }
+
+  const getActor = (period, actor) => {
+    return period?.[actor]?.netQty
+  }
+
   if (activeDetail === 'why') {
     return (
       <div className="detailPanel">
@@ -1298,8 +1310,7 @@ function DetailPanel({
     return (
       <div className="detailPanel">
         <p className="detailPanelTitle">
-          수급 보기 — 개인·외국인·기관 흐름
-          {flowSummary.latestDate ? ` (${flowSummary.latestDate})` : ''}
+          수급 보기 — 개인·외국인·기관 흐름 ({formatDateLabel(flowSummary.latestDate)})
         </p>
 
         <div className="miniGrid">
@@ -1324,28 +1335,47 @@ function DetailPanel({
         <div className="miniGrid">
           <MiniInsightCard
             title="최근 5일 개인"
-            text={formatSignedNumber(flowSummary.recent5?.individual?.netQty, '주')}
+            text={formatSignedNumber(getActor(flowSummary.recent5, 'individual'), '주')}
           />
           <MiniInsightCard
             title="최근 5일 외국인"
-            text={formatSignedNumber(flowSummary.recent5?.foreign?.netQty, '주')}
+            text={formatSignedNumber(getActor(flowSummary.recent5, 'foreign'), '주')}
           />
           <MiniInsightCard
             title="최근 5일 기관"
-            text={formatSignedNumber(flowSummary.recent5?.institution?.netQty, '주')}
+            text={formatSignedNumber(getActor(flowSummary.recent5, 'institution'), '주')}
+          />
+          <MiniInsightCard
+            title="최근 5일 해석"
+            text="단기 수급 쏠림을 확인하는 보조 지표입니다."
+          />
+        </div>
+
+        <div className="miniGrid">
+          <MiniInsightCard
+            title="최근 20일 개인"
+            text={formatSignedNumber(getActor(flowSummary.recent20, 'individual'), '주')}
           />
           <MiniInsightCard
             title="최근 20일 외국인"
-            text={formatSignedNumber(flowSummary.recent20?.foreign?.netQty, '주')}
+            text={formatSignedNumber(getActor(flowSummary.recent20, 'foreign'), '주')}
+          />
+          <MiniInsightCard
+            title="최근 20일 기관"
+            text={formatSignedNumber(getActor(flowSummary.recent20, 'institution'), '주')}
+          />
+          <MiniInsightCard
+            title="최근 20일 해석"
+            text="중기 수급 방향을 확인하는 참고 지표입니다."
           />
         </div>
 
         <ul className="detailList" style={{ marginTop: '12px' }}>
           <li>
-            개인 순매수가 강하고 외국인·기관이 함께 매도하면 개인 매수 쏠림 가능성을 확인합니다.
+            개인 순매수가 강하고 외국인·기관이 함께 순매도하면 개인 매수 쏠림 가능성을 확인합니다.
           </li>
           <li>
-            외국인과 기관이 함께 매수하면 수급은 우호적으로 볼 수 있지만, 가격이 이미 고점권인지도 같이 봐야 합니다.
+            외국인·기관이 함께 순매수하면 수급은 우호적으로 볼 수 있지만, 가격이 이미 고점권인지도 함께 확인해야 합니다.
           </li>
           <li>
             수급이 혼조일 때는 가격 흐름만 보고 단정하기보다 공시·뉴스와 거래량을 함께 확인해야 합니다.
