@@ -21,6 +21,11 @@ export default function StockGuardPanel({ onSendToChat }) {
   const [stockError, setStockError] = useState('')
   const [activeDetail, setActiveDetail] = useState('reason')
 
+  const [historyData, setHistoryData] = useState(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState('')
+  const [historyLoadedCode, setHistoryLoadedCode] = useState('')
+
   const debounceTimerRef = useRef(null)
   const lastLoadedNameRef = useRef('')
 
@@ -240,7 +245,6 @@ export default function StockGuardPanel({ onSendToChat }) {
     const prices = stockData.prices || []
     const summary = stockData.summary
     const current = stockData.current || {}
-
     const latest = prices[prices.length - 1]
     const recent20 = prices.slice(-20)
 
@@ -406,14 +410,21 @@ export default function StockGuardPanel({ onSendToChat }) {
     }
   }, [form])
 
+  const resetHistory = () => {
+    setHistoryData(null)
+    setHistoryError('')
+    setHistoryLoadedCode('')
+  }
+
   const loadStock = async (query) => {
     const trimmed = String(query || '').trim()
 
-    if (trimmed.length < 2) {
+    if (trimmed.length < 2 && !/^\d{6}$/.test(trimmed)) {
       setStockData(null)
       setCandidates([])
       setStockError('')
       updateForm('currentPrice', '')
+      resetHistory()
       return
     }
 
@@ -429,6 +440,7 @@ export default function StockGuardPanel({ onSendToChat }) {
         setCandidates(data.candidates || [])
         updateForm('currentPrice', '')
         setStockError('')
+        resetHistory()
         return
       }
 
@@ -438,6 +450,8 @@ export default function StockGuardPanel({ onSendToChat }) {
 
       setCandidates([])
       setStockData(data)
+      resetHistory()
+
       lastLoadedNameRef.current = data.stock?.name || trimmed
 
       if (data.stock?.name) updateForm('stockName', data.stock.name)
@@ -446,6 +460,7 @@ export default function StockGuardPanel({ onSendToChat }) {
       setStockData(null)
       setCandidates([])
       updateForm('currentPrice', '')
+      resetHistory()
       setStockError(error.message || '주가 데이터를 불러오는 중 오류가 발생했습니다.')
     } finally {
       setLoadingStock(false)
@@ -453,30 +468,78 @@ export default function StockGuardPanel({ onSendToChat }) {
   }
 
   useEffect(() => {
-  const name = form.stockName.trim()
+    const name = form.stockName.trim()
 
-  if (debounceTimerRef.current) {
-    clearTimeout(debounceTimerRef.current)
-  }
-
-  debounceTimerRef.current = setTimeout(() => {
-    if (name.length >= 2 && name !== lastLoadedNameRef.current) {
-      loadStock(name)
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
     }
 
-    if (name.length === 0) {
-      setStockData(null)
-      setCandidates([])
-      setStockError('')
-      updateForm('currentPrice', '')
-      lastLoadedNameRef.current = ''
-    }
-  }, 800)
+    debounceTimerRef.current = setTimeout(() => {
+      if (name.length === 0) {
+        setStockData(null)
+        setCandidates([])
+        setStockError('')
+        updateForm('currentPrice', '')
+        lastLoadedNameRef.current = ''
+        resetHistory()
+        return
+      }
 
-  return () => {
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
-  }
-}, [form.stockName])
+      if ((name.length >= 2 || /^\d{6}$/.test(name)) && name !== lastLoadedNameRef.current) {
+        loadStock(name)
+      }
+    }, 800)
+
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+    }
+  }, [form.stockName])
+
+  useEffect(() => {
+    const code = stockData?.stock?.code
+    const currentPrice = stockData?.summary?.currentPrice
+
+    if (activeDetail !== 'history') return
+    if (!code) return
+    if (historyLoading) return
+    if (historyLoadedCode === code && historyData) return
+
+    const loadHistory = async () => {
+      setHistoryLoading(true)
+      setHistoryError('')
+
+      try {
+        const params = new URLSearchParams({
+          code,
+          currentPrice: String(currentPrice || '')
+        })
+
+        const response = await fetch(`/api/stock-history?${params}`)
+        const data = await response.json()
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || '과거 유사 구간 데이터를 불러오지 못했습니다.')
+        }
+
+        setHistoryData(data)
+        setHistoryLoadedCode(code)
+      } catch (error) {
+        setHistoryData(null)
+        setHistoryError(error.message || '과거 유사 구간 데이터 조회 중 오류가 발생했습니다.')
+      } finally {
+        setHistoryLoading(false)
+      }
+    }
+
+    loadHistory()
+  }, [
+    activeDetail,
+    stockData?.stock?.code,
+    stockData?.summary?.currentPrice,
+    historyLoading,
+    historyLoadedCode,
+    historyData
+  ])
 
   const handleCandidateClick = (candidate) => {
     setCandidates([])
@@ -487,8 +550,9 @@ export default function StockGuardPanel({ onSendToChat }) {
   const buildDataSummary = () => {
     if (!stockData?.summary) return '주가 데이터: 아직 불러오지 않음'
 
-    const { stock, current, summary, flow, similarHistory } = stockData
+    const { stock, current, summary, flow } = stockData
     const flowSummary = flow?.summary
+    const similarHistory = historyData?.similarHistory
 
     return `
 [주가 데이터]
@@ -512,7 +576,7 @@ export default function StockGuardPanel({ onSendToChat }) {
 - 기관 순매수: ${flowSummary?.institution?.netQty ?? '정보 없음'}주
 
 [과거 유사 구간]
-- 분석 가능 여부: ${similarHistory?.available ? '가능' : '불가'}
+- 분석 가능 여부: ${similarHistory?.available ? '가능' : '아직 미조회 또는 불가'}
 - 유사 구간 수: ${similarHistory?.sampleCount ?? '정보 없음'}
 - 20거래일 후 분포: ${
       similarHistory?.available
@@ -1088,7 +1152,7 @@ ${buildAnalysisSummary()}
               {loadingStock
                 ? '종목 조회 중...'
                 : stockData
-                  ? `데이터 연결됨 · 장기 ${stockData.longPriceCount || 0}개`
+                  ? '데이터 연결됨'
                   : '종목명 입력 시 자동 조회'}
             </div>
           </div>
@@ -1215,6 +1279,9 @@ ${buildAnalysisSummary()}
                 activeDetail={activeDetail}
                 stockData={stockData}
                 marketDiagnostics={marketDiagnostics}
+                historyData={historyData}
+                historyLoading={historyLoading}
+                historyError={historyError}
                 formatWon={formatWon}
                 formatNumber={formatNumber}
                 formatSignedNumber={formatSignedNumber}
@@ -1290,6 +1357,9 @@ function DetailPanel({
   activeDetail,
   stockData,
   marketDiagnostics,
+  historyData,
+  historyLoading,
+  historyError,
   formatWon,
   formatNumber,
   formatSignedNumber,
@@ -1446,7 +1516,47 @@ function DetailPanel({
   }
 
   if (activeDetail === 'history') {
-    const similarHistory = stockData.similarHistory
+    if (historyLoading) {
+      return (
+        <div className="detailPanel">
+          <p className="detailPanelTitle">과거 유사 구간 — 실제 데이터 분석</p>
+
+          <div className="miniGrid">
+            <MiniInsightCard
+              title="분석 중"
+              text="과거 3년 안팎의 일봉 데이터를 불러와 현재와 유사한 구간을 찾는 중입니다."
+            />
+            <MiniInsightCard
+              title="호출 방식"
+              text="기본 종목 조회 때가 아니라, 이 탭을 열었을 때만 장기 데이터를 조회합니다."
+            />
+          </div>
+
+          <p style={safeNoticeStyle}>
+            API 호출량을 줄이기 위해 과거 유사 구간은 필요할 때만 불러옵니다.
+          </p>
+        </div>
+      )
+    }
+
+    if (historyError) {
+      return (
+        <div className="detailPanel">
+          <p className="detailPanelTitle">과거 유사 구간 — 실제 데이터 분석</p>
+
+          <div className="miniGrid">
+            <MiniInsightCard title="조회 실패" text={historyError} />
+            <MiniInsightCard title="현재 대체 해석" text={getPricePositionText(summary)} />
+          </div>
+
+          <p style={safeNoticeStyle}>
+            장기 데이터 조회에 실패해도 기본 주가·수급 점검은 계속 사용할 수 있습니다.
+          </p>
+        </div>
+      )
+    }
+
+    const similarHistory = historyData?.similarHistory
 
     if (!similarHistory?.available) {
       return (
@@ -1456,9 +1566,12 @@ function DetailPanel({
           <div className="miniGrid">
             <MiniInsightCard
               title="분석 상태"
-              text={similarHistory?.reason || '장기 일봉 데이터를 아직 불러오지 못했습니다.'}
+              text={similarHistory?.reason || '과거 유사 구간 탭을 열면 장기 일봉 데이터를 불러옵니다.'}
             />
-            <MiniInsightCard title="장기 데이터 수" text={`${stockData.longPriceCount || 0}개 일봉`} />
+            <MiniInsightCard
+              title="장기 데이터 수"
+              text={historyData?.longPriceCount ? `${historyData.longPriceCount}개 일봉` : '아직 조회 전'}
+            />
             <MiniInsightCard title="현재 대체 해석" text={getPricePositionText(summary)} />
           </div>
 
@@ -1478,7 +1591,10 @@ function DetailPanel({
 
         <div className="miniGrid">
           <MiniInsightCard title="유사 조건" text={similarHistory.conditionText} />
-          <MiniInsightCard title="유사 구간 수" text={`장기 일봉 내 ${similarHistory.sampleCount}개 구간`} />
+          <MiniInsightCard
+            title="유사 구간 수"
+            text={`장기 일봉 ${historyData?.longPriceCount || 0}개 중 ${similarHistory.sampleCount}개 구간`}
+          />
           <MiniInsightCard
             title="20거래일 후 분포"
             text={`상승 ${s.up20 ?? 0}회 · 하락 ${s.down20 ?? 0}회 · 평균 ${s.avgReturn20d ?? '-'}%`}
@@ -1489,11 +1605,19 @@ function DetailPanel({
           />
           <MiniInsightCard
             title="20거래일 내 최대 추가 하락"
-            text={s.maxExtraDrawdown20d !== null && s.maxExtraDrawdown20d !== undefined ? `${s.maxExtraDrawdown20d}%` : '계산 불가'}
+            text={
+              s.maxExtraDrawdown20d !== null && s.maxExtraDrawdown20d !== undefined
+                ? `${s.maxExtraDrawdown20d}%`
+                : '계산 불가'
+            }
           />
           <MiniInsightCard
             title="60거래일 내 최대 추가 하락"
-            text={s.maxExtraDrawdown60d !== null && s.maxExtraDrawdown60d !== undefined ? `${s.maxExtraDrawdown60d}%` : '계산 불가'}
+            text={
+              s.maxExtraDrawdown60d !== null && s.maxExtraDrawdown60d !== undefined
+                ? `${s.maxExtraDrawdown60d}%`
+                : '계산 불가'
+            }
           />
         </div>
 
