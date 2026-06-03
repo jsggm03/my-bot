@@ -1,5 +1,4 @@
 const STOCK_LIST = [
-  // KOSPI 대형주 / 대표주
   { name: '삼성전자', code: '005930', market: 'KOSPI', aliases: ['삼전'] },
   { name: '삼성전자우', code: '005935', market: 'KOSPI', aliases: ['삼전우'] },
   { name: 'SK하이닉스', code: '000660', market: 'KOSPI', aliases: ['하이닉스', 'sk하이닉스'] },
@@ -96,7 +95,6 @@ const STOCK_LIST = [
   { name: '코스맥스', code: '192820', market: 'KOSPI' },
   { name: '한국콜마', code: '161890', market: 'KOSPI' },
 
-  // KOSDAQ / 성장주 / 2차전지 / 바이오 / 게임
   { name: '에코프로비엠', code: '247540', market: 'KOSDAQ' },
   { name: '에코프로', code: '086520', market: 'KOSDAQ' },
   { name: '엘앤에프', code: '066970', market: 'KOSDAQ' },
@@ -202,6 +200,171 @@ function toNumber(value) {
   return Number.isFinite(n) ? n : 0
 }
 
+function pickNumber(row, keys) {
+  for (const key of keys) {
+    const value = row?.[key]
+
+    if (value !== undefined && value !== null && value !== '') {
+      return toNumber(value)
+    }
+  }
+
+  return null
+}
+
+function normalizeActorFromRaw(row, prefix) {
+  return {
+    buyQty: pickNumber(row, [`${prefix}_shnu_vol`]),
+    sellQty: pickNumber(row, [`${prefix}_seln_vol`]),
+    netQty: pickNumber(row, [`${prefix}_ntby_qty`]),
+    buyAmount: pickNumber(row, [`${prefix}_shnu_tr_pbmn`]),
+    sellAmount: pickNumber(row, [`${prefix}_seln_tr_pbmn`]),
+    netAmount: pickNumber(row, [`${prefix}_ntby_tr_pbmn`])
+  }
+}
+
+function sumActors(rows, prefix) {
+  const result = {
+    buyQty: 0,
+    sellQty: 0,
+    netQty: 0,
+    buyAmount: 0,
+    sellAmount: 0,
+    netAmount: 0
+  }
+
+  let hasAny = false
+
+  for (const row of rows) {
+    const actor = normalizeActorFromRaw(row, prefix)
+
+    for (const key of Object.keys(result)) {
+      if (actor[key] !== null && Number.isFinite(actor[key])) {
+        result[key] += actor[key]
+        hasAny = true
+      }
+    }
+  }
+
+  if (!hasAny) {
+    return {
+      buyQty: null,
+      sellQty: null,
+      netQty: null,
+      buyAmount: null,
+      sellAmount: null,
+      netAmount: null
+    }
+  }
+
+  return result
+}
+
+function buildFlowSignal({ individualNet, foreignNet, institutionNet }) {
+  if (individualNet > 0 && foreignNet < 0 && institutionNet < 0) {
+    return '개인 매수 쏠림 가능성'
+  }
+
+  if (individualNet < 0 && foreignNet > 0 && institutionNet > 0) {
+    return '외국인·기관 동반 매수 가능성'
+  }
+
+  if (foreignNet > 0 && institutionNet > 0) {
+    return '외국인·기관 수급 우호'
+  }
+
+  if (foreignNet < 0 && institutionNet < 0) {
+    return '외국인·기관 동반 매도 주의'
+  }
+
+  if (
+    individualNet !== null ||
+    foreignNet !== null ||
+    institutionNet !== null
+  ) {
+    return '수급 혼조'
+  }
+
+  return '수급 데이터 확인 필요'
+}
+
+function buildFlowSummaryFromRows(rows) {
+  const latest = rows[0] || null
+
+  const latestSummary = latest
+    ? {
+        individual: normalizeActorFromRaw(latest, 'prsn'),
+        foreign: normalizeActorFromRaw(latest, 'frgn'),
+        institution: normalizeActorFromRaw(latest, 'orgn')
+      }
+    : {
+        individual: {
+          buyQty: null,
+          sellQty: null,
+          netQty: null,
+          buyAmount: null,
+          sellAmount: null,
+          netAmount: null
+        },
+        foreign: {
+          buyQty: null,
+          sellQty: null,
+          netQty: null,
+          buyAmount: null,
+          sellAmount: null,
+          netAmount: null
+        },
+        institution: {
+          buyQty: null,
+          sellQty: null,
+          netQty: null,
+          buyAmount: null,
+          sellAmount: null,
+          netAmount: null
+        }
+      }
+
+  const recent5 = rows.slice(0, 5)
+  const recent20 = rows.slice(0, 20)
+
+  const recent5Summary = {
+    individual: sumActors(recent5, 'prsn'),
+    foreign: sumActors(recent5, 'frgn'),
+    institution: sumActors(recent5, 'orgn')
+  }
+
+  const recent20Summary = {
+    individual: sumActors(recent20, 'prsn'),
+    foreign: sumActors(recent20, 'frgn'),
+    institution: sumActors(recent20, 'orgn')
+  }
+
+  const individualNet = latestSummary.individual.netQty
+  const foreignNet = latestSummary.foreign.netQty
+  const institutionNet = latestSummary.institution.netQty
+
+  const signal = buildFlowSignal({
+    individualNet,
+    foreignNet,
+    institutionNet
+  })
+
+  return {
+    latestDate: latest?.stck_bsop_date || '',
+
+    // 기존 StockGuardPanel 호환용
+    individual: latestSummary.individual,
+    foreign: latestSummary.foreign,
+    institution: latestSummary.institution,
+    signal,
+
+    // 새 구조
+    latest: latestSummary,
+    recent5: recent5Summary,
+    recent20: recent20Summary
+  }
+}
+
 async function getKisToken() {
   const now = Date.now()
 
@@ -295,162 +458,6 @@ async function fetchCurrentPrice({ baseUrl, token, appkey, appsecret, stockCode 
   }
 }
 
-function pickNumber(row, keys) {
-  for (const key of keys) {
-    const value = row?.[key]
-
-    if (value !== undefined && value !== null && value !== '') {
-      return toNumber(value)
-    }
-  }
-
-  return null
-}
-
-function pickText(row, keys) {
-  for (const key of keys) {
-    const value = row?.[key]
-
-    if (value !== undefined && value !== null && value !== '') {
-      return String(value)
-    }
-  }
-
-  return ''
-}
-
-function normalizeInvestorRows(raw) {
-  const rows = Array.isArray(raw) ? raw : raw ? [raw] : []
-
-  return rows.map((row) => ({
-    category:
-      pickText(row, [
-        'invr_cls_name',
-        'invt_cls_name',
-        'ivtr_nm',
-        'invr_cls_code_name',
-        'invt_cls_code',
-        'invr_cls_code'
-      ]) || '투자자',
-    buyQty: pickNumber(row, [
-      'buy_qty',
-      'buy_vol',
-      'acml_buy_qty',
-      'stck_buy_qty',
-      'askp_rsqn1'
-    ]),
-    sellQty: pickNumber(row, [
-      'sell_qty',
-      'sell_vol',
-      'acml_sell_qty',
-      'stck_sell_qty',
-      'bidp_rsqn1'
-    ]),
-    netQty: pickNumber(row, [
-      'ntby_qty',
-      'net_buy_qty',
-      'net_buy_vol',
-      'smtl_ntby_qty',
-      'frgn_ntby_qty',
-      'orgn_ntby_qty',
-      'prsn_ntby_qty'
-    ]),
-    buyAmount: pickNumber(row, [
-      'buy_amt',
-      'buy_amount',
-      'acml_buy_amt',
-      'stck_buy_amt'
-    ]),
-    sellAmount: pickNumber(row, [
-      'sell_amt',
-      'sell_amount',
-      'acml_sell_amt',
-      'stck_sell_amt'
-    ]),
-    netAmount: pickNumber(row, [
-      'ntby_tr_pbmn',
-      'net_buy_amt',
-      'net_amount',
-      'smtl_ntby_tr_pbmn'
-    ]),
-    raw: row
-  }))
-}
-
-function findInvestorRow(rows, names) {
-  return rows.find((row) =>
-    names.some((name) => String(row.category || '').includes(name))
-  )
-}
-
-function normalizeActor(row, directNetQty = null) {
-  return {
-    buyQty: row?.buyQty ?? null,
-    sellQty: row?.sellQty ?? null,
-    netQty: row?.netQty ?? directNetQty ?? null,
-    buyAmount: row?.buyAmount ?? null,
-    sellAmount: row?.sellAmount ?? null,
-    netAmount: row?.netAmount ?? null
-  }
-}
-
-function buildFlowSummary(rows, direct = {}) {
-  const individualRow = findInvestorRow(rows, ['개인', '개미'])
-  const foreignRow = findInvestorRow(rows, ['외국인', '외인'])
-  const institutionRow = findInvestorRow(rows, ['기관', '금융투자', '투신', '연기금'])
-  const programRow = findInvestorRow(rows, ['프로그램'])
-
-  const individual = normalizeActor(
-    individualRow,
-    direct.individualNetQty
-  )
-
-  const foreign = normalizeActor(
-    foreignRow,
-    direct.foreignNetQty
-  )
-
-  const institution = normalizeActor(
-    institutionRow,
-    direct.institutionNetQty
-  )
-
-  const program = normalizeActor(
-    programRow,
-    direct.programNetQty
-  )
-
-  let signal = '수급 데이터 확인 필요'
-
-  const individualNet = individual.netQty
-  const foreignNet = foreign.netQty
-  const institutionNet = institution.netQty
-
-  if (individualNet > 0 && foreignNet < 0 && institutionNet < 0) {
-    signal = '개인 매수 쏠림 가능성'
-  } else if (individualNet < 0 && foreignNet > 0 && institutionNet > 0) {
-    signal = '외국인·기관 동반 매수 가능성'
-  } else if (foreignNet > 0 && institutionNet > 0) {
-    signal = '외국인·기관 수급 우호'
-  } else if (foreignNet < 0 && institutionNet < 0) {
-    signal = '외국인·기관 동반 매도 주의'
-  } else if (
-    individualNet !== null ||
-    foreignNet !== null ||
-    institutionNet !== null
-  ) {
-    signal = '수급 혼조'
-  }
-
-  return {
-    individual,
-    foreign,
-    institution,
-    program,
-    signal
-  }
-}
-
 async function fetchInvestorFlow({ baseUrl, token, appkey, appsecret, stockCode }) {
   const params = new URLSearchParams({
     FID_COND_MRKT_DIV_CODE: 'J',
@@ -485,24 +492,20 @@ async function fetchInvestorFlow({ baseUrl, token, appkey, appsecret, stockCode 
     throw new Error(data.msg1 || `수급 조회 실패: ${text}`)
   }
 
-  const raw = data.output || data.output1 || data.output2 || []
-  const rows = normalizeInvestorRows(raw)
-
-  const rawObject = !Array.isArray(raw) && raw ? raw : {}
-
-  const direct = {
-    individualNetQty: pickNumber(rawObject, ['prsn_ntby_qty', 'indv_ntby_qty', 'indi_ntby_qty']),
-    foreignNetQty: pickNumber(rawObject, ['frgn_ntby_qty', 'frgn_ntby_vol', 'foreign_ntby_qty']),
-    institutionNetQty: pickNumber(rawObject, ['orgn_ntby_qty', 'istt_ntby_qty', 'institution_ntby_qty']),
-    programNetQty: pickNumber(rawObject, ['pgtr_ntby_qty', 'program_ntby_qty'])
-  }
+  const rows = Array.isArray(data.output)
+    ? data.output
+    : Array.isArray(data.output1)
+      ? data.output1
+      : Array.isArray(data.output2)
+        ? data.output2
+        : []
 
   return {
     source: 'KIS 주식현재가 투자자',
     fetchedAt: new Date().toISOString(),
     rows,
-    summary: buildFlowSummary(rows, direct),
-    raw
+    summary: buildFlowSummaryFromRows(rows),
+    raw: data.output || data.output1 || data.output2 || null
   }
 }
 
@@ -575,8 +578,8 @@ function calcChange(prices, days) {
 
 function summarizePrices(prices, currentPrice) {
   const closes = prices.map((p) => p.close).filter(Boolean)
-  const high = closes.length ? Math.max(...closes) : currentPrice
-  const low = closes.length ? Math.min(...closes) : currentPrice
+  const high = closes.length ? Math.max(...closes, currentPrice) : currentPrice
+  const low = closes.length ? Math.min(...closes, currentPrice) : currentPrice
 
   return {
     currentPrice,
@@ -634,52 +637,52 @@ export default async function handler(req, res) {
     const token = await getKisToken()
 
     const current = await fetchCurrentPrice({
-  baseUrl,
-  token,
-  appkey,
-  appsecret,
-  stockCode: stock.code
-})
+      baseUrl,
+      token,
+      appkey,
+      appsecret,
+      stockCode: stock.code
+    })
 
-const prices = await fetchDailyPrices({
-  baseUrl,
-  token,
-  appkey,
-  appsecret,
-  stockCode: stock.code
-})
+    const prices = await fetchDailyPrices({
+      baseUrl,
+      token,
+      appkey,
+      appsecret,
+      stockCode: stock.code
+    })
 
-let flow = null
-let flowError = null
+    let flow = null
+    let flowError = null
 
-try {
-  flow = await fetchInvestorFlow({
-    baseUrl,
-    token,
-    appkey,
-    appsecret,
-    stockCode: stock.code
-  })
-} catch (error) {
-  console.warn('investor flow api warning:', error)
-  flowError = error.message || '수급 데이터를 불러오지 못했습니다.'
-}
+    try {
+      flow = await fetchInvestorFlow({
+        baseUrl,
+        token,
+        appkey,
+        appsecret,
+        stockCode: stock.code
+      })
+    } catch (error) {
+      console.warn('investor flow api warning:', error)
+      flowError = error.message || '수급 데이터를 불러오지 못했습니다.'
+    }
 
-const summary = summarizePrices(prices, current.currentPrice)
+    const summary = summarizePrices(prices, current.currentPrice)
 
-return res.status(200).json({
-  success: true,
-  stock: {
-    name: stock.name,
-    code: stock.code,
-    market: stock.market
-  },
-  current,
-  prices,
-  summary,
-  flow,
-  flowError
-})
+    return res.status(200).json({
+      success: true,
+      stock: {
+        name: stock.name,
+        code: stock.code,
+        market: stock.market
+      },
+      current,
+      prices,
+      summary,
+      flow,
+      flowError
+    })
   } catch (error) {
     console.error('stock api error:', error)
 
