@@ -295,6 +295,217 @@ async function fetchCurrentPrice({ baseUrl, token, appkey, appsecret, stockCode 
   }
 }
 
+function pickNumber(row, keys) {
+  for (const key of keys) {
+    const value = row?.[key]
+
+    if (value !== undefined && value !== null && value !== '') {
+      return toNumber(value)
+    }
+  }
+
+  return null
+}
+
+function pickText(row, keys) {
+  for (const key of keys) {
+    const value = row?.[key]
+
+    if (value !== undefined && value !== null && value !== '') {
+      return String(value)
+    }
+  }
+
+  return ''
+}
+
+function normalizeInvestorRows(raw) {
+  const rows = Array.isArray(raw) ? raw : raw ? [raw] : []
+
+  return rows.map((row) => ({
+    category:
+      pickText(row, [
+        'invr_cls_name',
+        'invt_cls_name',
+        'ivtr_nm',
+        'invr_cls_code_name',
+        'invt_cls_code',
+        'invr_cls_code'
+      ]) || '투자자',
+    buyQty: pickNumber(row, [
+      'buy_qty',
+      'buy_vol',
+      'acml_buy_qty',
+      'stck_buy_qty',
+      'askp_rsqn1'
+    ]),
+    sellQty: pickNumber(row, [
+      'sell_qty',
+      'sell_vol',
+      'acml_sell_qty',
+      'stck_sell_qty',
+      'bidp_rsqn1'
+    ]),
+    netQty: pickNumber(row, [
+      'ntby_qty',
+      'net_buy_qty',
+      'net_buy_vol',
+      'smtl_ntby_qty',
+      'frgn_ntby_qty',
+      'orgn_ntby_qty',
+      'prsn_ntby_qty'
+    ]),
+    buyAmount: pickNumber(row, [
+      'buy_amt',
+      'buy_amount',
+      'acml_buy_amt',
+      'stck_buy_amt'
+    ]),
+    sellAmount: pickNumber(row, [
+      'sell_amt',
+      'sell_amount',
+      'acml_sell_amt',
+      'stck_sell_amt'
+    ]),
+    netAmount: pickNumber(row, [
+      'ntby_tr_pbmn',
+      'net_buy_amt',
+      'net_amount',
+      'smtl_ntby_tr_pbmn'
+    ]),
+    raw: row
+  }))
+}
+
+function findInvestorRow(rows, names) {
+  return rows.find((row) =>
+    names.some((name) => String(row.category || '').includes(name))
+  )
+}
+
+function normalizeActor(row, directNetQty = null) {
+  return {
+    buyQty: row?.buyQty ?? null,
+    sellQty: row?.sellQty ?? null,
+    netQty: row?.netQty ?? directNetQty ?? null,
+    buyAmount: row?.buyAmount ?? null,
+    sellAmount: row?.sellAmount ?? null,
+    netAmount: row?.netAmount ?? null
+  }
+}
+
+function buildFlowSummary(rows, direct = {}) {
+  const individualRow = findInvestorRow(rows, ['개인', '개미'])
+  const foreignRow = findInvestorRow(rows, ['외국인', '외인'])
+  const institutionRow = findInvestorRow(rows, ['기관', '금융투자', '투신', '연기금'])
+  const programRow = findInvestorRow(rows, ['프로그램'])
+
+  const individual = normalizeActor(
+    individualRow,
+    direct.individualNetQty
+  )
+
+  const foreign = normalizeActor(
+    foreignRow,
+    direct.foreignNetQty
+  )
+
+  const institution = normalizeActor(
+    institutionRow,
+    direct.institutionNetQty
+  )
+
+  const program = normalizeActor(
+    programRow,
+    direct.programNetQty
+  )
+
+  let signal = '수급 데이터 확인 필요'
+
+  const individualNet = individual.netQty
+  const foreignNet = foreign.netQty
+  const institutionNet = institution.netQty
+
+  if (individualNet > 0 && foreignNet < 0 && institutionNet < 0) {
+    signal = '개인 매수 쏠림 가능성'
+  } else if (individualNet < 0 && foreignNet > 0 && institutionNet > 0) {
+    signal = '외국인·기관 동반 매수 가능성'
+  } else if (foreignNet > 0 && institutionNet > 0) {
+    signal = '외국인·기관 수급 우호'
+  } else if (foreignNet < 0 && institutionNet < 0) {
+    signal = '외국인·기관 동반 매도 주의'
+  } else if (
+    individualNet !== null ||
+    foreignNet !== null ||
+    institutionNet !== null
+  ) {
+    signal = '수급 혼조'
+  }
+
+  return {
+    individual,
+    foreign,
+    institution,
+    program,
+    signal
+  }
+}
+
+async function fetchInvestorFlow({ baseUrl, token, appkey, appsecret, stockCode }) {
+  const params = new URLSearchParams({
+    FID_COND_MRKT_DIV_CODE: 'J',
+    FID_INPUT_ISCD: stockCode
+  })
+
+  const response = await fetch(
+    `${baseUrl}/uapi/domestic-stock/v1/quotations/inquire-investor?${params}`,
+    {
+      method: 'GET',
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        authorization: `Bearer ${token}`,
+        appkey,
+        appsecret,
+        tr_id: 'FHKST01010900',
+        custtype: 'P'
+      }
+    }
+  )
+
+  const text = await response.text()
+  let data = null
+
+  try {
+    data = JSON.parse(text)
+  } catch {
+    throw new Error(`수급 응답 파싱 실패: ${text}`)
+  }
+
+  if (!response.ok || data.rt_cd !== '0') {
+    throw new Error(data.msg1 || `수급 조회 실패: ${text}`)
+  }
+
+  const raw = data.output || data.output1 || data.output2 || []
+  const rows = normalizeInvestorRows(raw)
+
+  const rawObject = !Array.isArray(raw) && raw ? raw : {}
+
+  const direct = {
+    individualNetQty: pickNumber(rawObject, ['prsn_ntby_qty', 'indv_ntby_qty', 'indi_ntby_qty']),
+    foreignNetQty: pickNumber(rawObject, ['frgn_ntby_qty', 'frgn_ntby_vol', 'foreign_ntby_qty']),
+    institutionNetQty: pickNumber(rawObject, ['orgn_ntby_qty', 'istt_ntby_qty', 'institution_ntby_qty']),
+    programNetQty: pickNumber(rawObject, ['pgtr_ntby_qty', 'program_ntby_qty'])
+  }
+
+  return {
+    source: 'KIS 주식현재가 투자자',
+    fetchedAt: new Date().toISOString(),
+    rows,
+    summary: buildFlowSummary(rows, direct),
+    raw
+  }
+}
+
 async function fetchDailyPrices({ baseUrl, token, appkey, appsecret, stockCode }) {
   const today = new Date()
   const start = new Date()
@@ -423,34 +634,52 @@ export default async function handler(req, res) {
     const token = await getKisToken()
 
     const current = await fetchCurrentPrice({
-      baseUrl,
-      token,
-      appkey,
-      appsecret,
-      stockCode: stock.code
-    })
+  baseUrl,
+  token,
+  appkey,
+  appsecret,
+  stockCode: stock.code
+})
 
-    const prices = await fetchDailyPrices({
-      baseUrl,
-      token,
-      appkey,
-      appsecret,
-      stockCode: stock.code
-    })
+const prices = await fetchDailyPrices({
+  baseUrl,
+  token,
+  appkey,
+  appsecret,
+  stockCode: stock.code
+})
 
-    const summary = summarizePrices(prices, current.currentPrice)
+let flow = null
+let flowError = null
 
-    return res.status(200).json({
-      success: true,
-      stock: {
-        name: stock.name,
-        code: stock.code,
-        market: stock.market
-      },
-      current,
-      prices,
-      summary
-    })
+try {
+  flow = await fetchInvestorFlow({
+    baseUrl,
+    token,
+    appkey,
+    appsecret,
+    stockCode: stock.code
+  })
+} catch (error) {
+  console.warn('investor flow api warning:', error)
+  flowError = error.message || '수급 데이터를 불러오지 못했습니다.'
+}
+
+const summary = summarizePrices(prices, current.currentPrice)
+
+return res.status(200).json({
+  success: true,
+  stock: {
+    name: stock.name,
+    code: stock.code,
+    market: stock.market
+  },
+  current,
+  prices,
+  summary,
+  flow,
+  flowError
+})
   } catch (error) {
     console.error('stock api error:', error)
 
