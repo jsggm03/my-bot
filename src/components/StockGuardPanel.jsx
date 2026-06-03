@@ -1264,9 +1264,6 @@ ${buildAnalysisSummary()}
                 <DetailButton id="flow" active={activeDetail} onClick={setActiveDetail}>
                   수급 보기
                 </DetailButton>
-                <DetailButton id="news" active={activeDetail} onClick={setActiveDetail}>
-                  공시·뉴스
-                </DetailButton>
                 <DetailButton id="history" active={activeDetail} onClick={setActiveDetail}>
                   과거 유사 구간
                 </DetailButton>
@@ -1480,41 +1477,6 @@ function DetailPanel({
     )
   }
 
-  if (activeDetail === 'news') {
-    return (
-      <div className="detailPanel">
-        <p className="detailPanelTitle">공시·뉴스 — 확인 우선순위</p>
-
-        <div className="miniGrid">
-          <MiniInsightCard
-            title="가격 변동"
-            text={`최근 5거래일 ${summary.change5d}%, 최근 20거래일 ${summary.change20d}% 흐름입니다.`}
-          />
-          <MiniInsightCard
-            title="거래량"
-            text={
-              marketDiagnostics.volumeRatio
-                ? `20거래일 평균 대비 약 ${marketDiagnostics.volumeRatio.toFixed(2)}배입니다.`
-                : '거래량 비교 데이터가 부족합니다.'
-            }
-          />
-          <MiniInsightCard title="수급" text={marketDiagnostics.flowSignal || '수급 데이터 확인 대기 중입니다.'} />
-        </div>
-
-        <ul className="detailList" style={{ marginTop: '12px' }}>
-          <li>가격 변동이 큰 경우 실적, 공시, 업종 이슈를 우선 확인합니다.</li>
-          <li>거래량이 늘었다면 단순 등락보다 이벤트 발생 여부를 먼저 봅니다.</li>
-          <li>수급 변화가 일시적인지, 여러 거래일 지속되는 흐름인지 확인합니다.</li>
-          <li>뉴스 제목만 보고 원인을 단정하지 말고 가격·거래량·수급 변화와 함께 확인합니다.</li>
-        </ul>
-
-        <p style={safeNoticeStyle}>
-          현재는 실제 뉴스 API가 아니라, 보유한 가격·거래량·수급 데이터로 무엇을 먼저 확인할지 안내하는 단계입니다.
-        </p>
-      </div>
-    )
-  }
-
   if (activeDetail === 'history') {
     if (historyLoading) {
       return (
@@ -1672,9 +1634,9 @@ function DetailPanel({
           value={marketDiagnostics.volumeRatio ? `${marketDiagnostics.volumeRatio.toFixed(2)}배` : '-'}
           comment={getVolumeText(marketDiagnostics.volumeRatio)}
         />
-        <MetricInsightCard title="개인 순매수" value={formatSignedNumber(flowSummary?.individual?.netQty, '주')} comment="개인 수급은 감정적 쏠림 여부를 볼 때 참고합니다." />
-        <MetricInsightCard title="외국인 순매수" value={formatSignedNumber(flowSummary?.foreign?.netQty, '주')} comment="외국인 수급은 중장기 수급 방향을 볼 때 참고합니다." />
-        <MetricInsightCard title="기관 순매수" value={formatSignedNumber(flowSummary?.institution?.netQty, '주')} comment="기관 수급은 단기·중기 수급 확인에 참고합니다." />
+        <MetricInsightCard title="개인 순매수" value={formatSignedNumber(flowSummary?.individual?.netQty, '주')} comment="개인 수급은 최신 거래일 기준입니다." />
+        <MetricInsightCard title="외국인 순매수" value={formatSignedNumber(flowSummary?.foreign?.netQty, '주')} comment="외국인 수급은 최신 거래일 기준입니다." />
+        <MetricInsightCard title="기관 순매수" value={formatSignedNumber(flowSummary?.institution?.netQty, '주')} comment="기관 수급은 최신 거래일 기준입니다." />
       </div>
     </div>
   )
