@@ -66,7 +66,7 @@ export default function StockGuardPanel({ onSendToChat }) {
   const formatSignedAmountShort = (value) => {
     const n = Number(value)
     if (!Number.isFinite(n)) return '-'
-    const sign = n > 0 ? '+' : ''
+    const sign = n > 0 ? '+' : n < 0 ? '-' : ''
     return `${sign}${formatAmountShort(Math.abs(n))}`
   }
 
@@ -90,6 +90,110 @@ export default function StockGuardPanel({ onSendToChat }) {
     return '미입력'
   }
 
+  const getFlowActorText = (actorName, value) => {
+    const n = Number(value)
+    if (!Number.isFinite(n)) return `${actorName} 데이터 없음`
+    if (n > 0) return `${actorName} 순매수`
+    if (n < 0) return `${actorName} 순매도`
+    return `${actorName} 중립`
+  }
+
+  const buildFlowInterpretation = (period) => {
+    if (!period) return '수급 데이터 확인 필요'
+
+    const individual = Number(period.individual?.netQty)
+    const foreign = Number(period.foreign?.netQty)
+    const institution = Number(period.institution?.netQty)
+
+    const hasIndividual = Number.isFinite(individual)
+    const hasForeign = Number.isFinite(foreign)
+    const hasInstitution = Number.isFinite(institution)
+
+    if (!hasIndividual && !hasForeign && !hasInstitution) {
+      return '수급 데이터 확인 필요'
+    }
+
+    const buyActors = []
+    const sellActors = []
+
+    if (individual > 0) buyActors.push('개인')
+    if (foreign > 0) buyActors.push('외국인')
+    if (institution > 0) buyActors.push('기관')
+
+    if (individual < 0) sellActors.push('개인')
+    if (foreign < 0) sellActors.push('외국인')
+    if (institution < 0) sellActors.push('기관')
+
+    if (individual > 0 && foreign < 0 && institution < 0) {
+      return '개인 순매수 우위, 외국인·기관 순매도'
+    }
+
+    if (individual < 0 && foreign > 0 && institution > 0) {
+      return '외국인·기관 순매수 우위, 개인 순매도'
+    }
+
+    if (foreign > 0 && institution > 0) {
+      return '외국인·기관 수급 우호'
+    }
+
+    if (foreign < 0 && institution < 0) {
+      return '외국인·기관 동반 순매도 주의'
+    }
+
+    if (buyActors.length > 0 && sellActors.length > 0) {
+      return `${buyActors.join('·')} 순매수, ${sellActors.join('·')} 순매도`
+    }
+
+    if (buyActors.length > 0) {
+      return `${buyActors.join('·')} 순매수 우위`
+    }
+
+    if (sellActors.length > 0) {
+      return `${sellActors.join('·')} 순매도 우위`
+    }
+
+    return '수급 중립'
+  }
+
+  const buildFlowConsistency = (flowSummary) => {
+    if (!flowSummary) return '수급 데이터 확인 필요'
+
+    const latestText = buildFlowInterpretation(flowSummary.latest || flowSummary)
+    const recent20Text = buildFlowInterpretation(flowSummary.recent20)
+
+    const latestForeign = Number(
+      flowSummary.latest?.foreign?.netQty ?? flowSummary.foreign?.netQty
+    )
+    const latestInstitution = Number(
+      flowSummary.latest?.institution?.netQty ?? flowSummary.institution?.netQty
+    )
+    const recent20Foreign = Number(flowSummary.recent20?.foreign?.netQty)
+    const recent20Institution = Number(flowSummary.recent20?.institution?.netQty)
+
+    const latestBigMoneyPositive = latestForeign > 0 && latestInstitution > 0
+    const latestBigMoneyNegative = latestForeign < 0 && latestInstitution < 0
+    const recent20BigMoneyPositive = recent20Foreign > 0 && recent20Institution > 0
+    const recent20BigMoneyNegative = recent20Foreign < 0 && recent20Institution < 0
+
+    if (latestBigMoneyPositive && recent20BigMoneyPositive) {
+      return '최신일과 최근 20일 모두 외국인·기관 수급이 우호적입니다.'
+    }
+
+    if (latestBigMoneyNegative && recent20BigMoneyNegative) {
+      return '최신일과 최근 20일 모두 외국인·기관 순매도 흐름이어서 주의가 필요합니다.'
+    }
+
+    if (latestBigMoneyPositive && recent20BigMoneyNegative) {
+      return '최근 20일은 약했지만 최신일 수급은 개선되는 모습입니다.'
+    }
+
+    if (latestBigMoneyNegative && recent20BigMoneyPositive) {
+      return '최근 20일은 우호적이었지만 최신일 수급은 약해진 모습입니다.'
+    }
+
+    return `최신일은 '${latestText}', 최근 20일은 '${recent20Text}'입니다.`
+  }
+
   const marketDiagnostics = useMemo(() => {
     if (!stockData?.summary) {
       return {
@@ -99,6 +203,9 @@ export default function StockGuardPanel({ onSendToChat }) {
         flags: [],
         reasonSummary: [],
         flowSignal: '',
+        flowRecent5Signal: '',
+        flowRecent20Signal: '',
+        flowConsistency: '',
         riskLabels: [
           {
             type: 'neutral',
@@ -131,13 +238,16 @@ export default function StockGuardPanel({ onSendToChat }) {
     const volumeRatio = avgVolume20 > 0 ? latestVolume / avgVolume20 : null
 
     const flowSummary = stockData.flow?.summary
-    const individualNet =
-      flowSummary?.latest?.individual?.netQty ?? flowSummary?.individual?.netQty ?? null
-    const foreignNet =
-      flowSummary?.latest?.foreign?.netQty ?? flowSummary?.foreign?.netQty ?? null
-    const institutionNet =
-      flowSummary?.latest?.institution?.netQty ?? flowSummary?.institution?.netQty ?? null
-    const flowSignal = flowSummary?.signal || ''
+    const latestFlow = flowSummary?.latest || flowSummary
+
+    const individualNet = latestFlow?.individual?.netQty ?? null
+    const foreignNet = latestFlow?.foreign?.netQty ?? null
+    const institutionNet = latestFlow?.institution?.netQty ?? null
+
+    const flowSignal = flowSummary?.signal || buildFlowInterpretation(latestFlow)
+    const flowRecent5Signal = buildFlowInterpretation(flowSummary?.recent5)
+    const flowRecent20Signal = buildFlowInterpretation(flowSummary?.recent20)
+    const flowConsistency = buildFlowConsistency(flowSummary)
 
     const flags = []
     const reasonSummary = []
@@ -189,7 +299,11 @@ export default function StockGuardPanel({ onSendToChat }) {
 
     if (flowSignal) {
       flags.push(flowSignal)
-      reasonSummary.push(`수급 기준으로는 '${flowSignal}' 상태입니다.`)
+      reasonSummary.push(`최신일 수급은 '${flowSignal}'로 해석됩니다.`)
+    }
+
+    if (flowRecent20Signal && flowRecent20Signal !== '수급 데이터 확인 필요') {
+      reasonSummary.push(`최근 20일 수급은 '${flowRecent20Signal}'입니다.`)
     }
 
     const avgPrice = Number(form.averagePrice)
@@ -285,6 +399,19 @@ export default function StockGuardPanel({ onSendToChat }) {
       })
     }
 
+    if (
+      form.action === '더 살까?' &&
+      foreignNet > 0 &&
+      institutionNet > 0 &&
+      (summary.change5d >= 10 || summary.drawdownFromHigh > -5)
+    ) {
+      riskLabels.push({
+        type: 'warning',
+        title: '우호 수급 속 고점 주의',
+        desc: '외국인·기관 수급이 우호적이어도 가격이 이미 오른 상태라면 진입 기준을 더 엄격히 봐야 합니다.'
+      })
+    }
+
     if (riskLabels.length === 0) {
       riskLabels.push({
         type: 'neutral',
@@ -301,6 +428,9 @@ export default function StockGuardPanel({ onSendToChat }) {
       flags,
       reasonSummary,
       flowSignal,
+      flowRecent5Signal,
+      flowRecent20Signal,
+      flowConsistency,
       riskLabels
     }
   }, [stockData, form.action, form.emotion, form.averagePrice, form.currentPrice])
@@ -471,6 +601,10 @@ export default function StockGuardPanel({ onSendToChat }) {
 
 [수급 데이터]
 - 수급 기준일: ${flowSummary?.latestDate || '정보 없음'}
+- 최신일 수급 해석: ${marketDiagnostics.flowSignal || '정보 없음'}
+- 최근 5일 수급 해석: ${marketDiagnostics.flowRecent5Signal || '정보 없음'}
+- 최근 20일 수급 해석: ${marketDiagnostics.flowRecent20Signal || '정보 없음'}
+- 수급 일관성: ${marketDiagnostics.flowConsistency || '정보 없음'}
 - 개인 순매수: ${
       flowSummary?.individual?.netQty !== undefined
         ? `${flowSummary.individual.netQty}주`
@@ -486,7 +620,6 @@ export default function StockGuardPanel({ onSendToChat }) {
         ? `${flowSummary.institution.netQty}주`
         : '정보 없음'
     }
-- 수급 해석: ${flowSummary?.signal || '정보 없음'}
 `.trim()
   }
 
@@ -1145,6 +1278,8 @@ ${buildAnalysisSummary()}
                 formatSignedNumber={formatSignedNumber}
                 formatAmountShort={formatAmountShort}
                 formatSignedAmountShort={formatSignedAmountShort}
+                buildFlowInterpretation={buildFlowInterpretation}
+                buildFlowConsistency={buildFlowConsistency}
               />
             </section>
           )}
@@ -1215,7 +1350,8 @@ function DetailPanel({
   formatNumber,
   formatSignedNumber,
   formatAmountShort,
-  formatSignedAmountShort
+  buildFlowInterpretation,
+  buildFlowConsistency
 }) {
   const summary = stockData.summary
   const current = stockData.current || {}
@@ -1259,7 +1395,7 @@ function DetailPanel({
           />
           <MiniInsightCard
             title="수급 신호"
-            text={flowSummary?.signal || '수급 데이터 확인 대기 중입니다.'}
+            text={marketDiagnostics.flowSignal || '수급 데이터 확인 대기 중입니다.'}
           />
         </div>
 
@@ -1275,6 +1411,7 @@ function DetailPanel({
               ? marketDiagnostics.flags.join(', ')
               : '뚜렷한 급등·급락 신호 없음'}
           </li>
+          {marketDiagnostics.flowConsistency && <li>{marketDiagnostics.flowConsistency}</li>}
         </ul>
 
         <p style={safeNoticeStyle}>
@@ -1307,6 +1444,11 @@ function DetailPanel({
       institution: flowSummary.institution
     }
 
+    const latestText = buildFlowInterpretation(latest)
+    const recent5Text = buildFlowInterpretation(flowSummary.recent5)
+    const recent20Text = buildFlowInterpretation(flowSummary.recent20)
+    const consistencyText = buildFlowConsistency(flowSummary)
+
     return (
       <div className="detailPanel">
         <p className="detailPanelTitle">
@@ -1326,10 +1468,7 @@ function DetailPanel({
             title="기관 순매수"
             text={formatSignedNumber(latest.institution?.netQty, '주')}
           />
-          <MiniInsightCard
-            title="수급 해석"
-            text={flowSummary.signal || '수급 데이터 확인 필요'}
-          />
+          <MiniInsightCard title="최신일 해석" text={latestText} />
         </div>
 
         <div className="miniGrid">
@@ -1345,10 +1484,7 @@ function DetailPanel({
             title="최근 5일 기관"
             text={formatSignedNumber(getActor(flowSummary.recent5, 'institution'), '주')}
           />
-          <MiniInsightCard
-            title="최근 5일 해석"
-            text="단기 수급 쏠림을 확인하는 보조 지표입니다."
-          />
+          <MiniInsightCard title="최근 5일 해석" text={recent5Text} />
         </div>
 
         <div className="miniGrid">
@@ -1364,13 +1500,11 @@ function DetailPanel({
             title="최근 20일 기관"
             text={formatSignedNumber(getActor(flowSummary.recent20, 'institution'), '주')}
           />
-          <MiniInsightCard
-            title="최근 20일 해석"
-            text="중기 수급 방향을 확인하는 참고 지표입니다."
-          />
+          <MiniInsightCard title="최근 20일 해석" text={recent20Text} />
         </div>
 
         <ul className="detailList" style={{ marginTop: '12px' }}>
+          <li>{consistencyText}</li>
           <li>
             개인 순매수가 강하고 외국인·기관이 함께 순매도하면 개인 매수 쏠림 가능성을 확인합니다.
           </li>
