@@ -7,8 +7,10 @@ export default function AvatarPanel({
   vrmAvatarRef,
   onAvatarReady,
   userVideoRef,
-  videoReady = false,
   cameraActive = false,
+  micActive = false,
+  onCameraToggle,
+  onMicToggle,
   onStart,
   onStop,
   onInterrupt,
@@ -103,6 +105,14 @@ export default function AvatarPanel({
     onInterrupt?.()
   }
 
+  const handleCameraClick = () => {
+    onCameraToggle?.()
+  }
+
+  const handleMicClick = () => {
+    onMicToggle?.()
+  }
+
   return (
     <>
       <style>{`
@@ -144,11 +154,6 @@ export default function AvatarPanel({
           border-color: #3b2a1c;
         }
 
-        .avatarModeButton:disabled {
-          cursor: not-allowed;
-          opacity: 0.55;
-        }
-
         .avatarStage {
           flex: 1;
           min-height: 0;
@@ -157,7 +162,7 @@ export default function AvatarPanel({
           align-items: center;
           justify-content: center;
           padding: 20px 16px 24px;
-          gap: 14px;
+          gap: 16px;
           background: #fffaf3;
         }
 
@@ -165,15 +170,15 @@ export default function AvatarPanel({
           width: 100%;
           display: grid;
           grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-          gap: 18px;
+          gap: 22px;
           align-items: stretch;
           justify-content: center;
-          max-width: 560px;
+          max-width: 660px;
         }
 
         .avatarCard {
           position: relative;
-          height: 250px;
+          height: 280px;
           border-radius: 24px;
           background: #d5b48d;
           overflow: hidden;
@@ -303,7 +308,7 @@ export default function AvatarPanel({
         }
 
         .camCard {
-          height: 250px;
+          height: 280px;
           border-radius: 24px;
           background: #ecd5ad;
           border: 1px solid rgba(120, 83, 45, 0.16);
@@ -324,7 +329,7 @@ export default function AvatarPanel({
 
         .camPlaceholder strong {
           display: block;
-          font-size: 21px;
+          font-size: 22px;
           font-weight: 950;
           color: #4b5563;
         }
@@ -332,7 +337,7 @@ export default function AvatarPanel({
         .camPlaceholder span {
           display: block;
           margin-top: 8px;
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 800;
         }
 
@@ -340,48 +345,81 @@ export default function AvatarPanel({
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 10px;
+          gap: 14px;
           flex-wrap: wrap;
         }
 
         .avatarToggleButton {
-          min-width: 96px;
-          height: 46px;
-          border: 1px solid rgba(160, 128, 96, 0.22);
-          border-radius: 14px;
+          min-width: 150px;
+          height: 56px;
+          border: 1px solid rgba(160, 128, 96, 0.24);
+          border-radius: 16px;
           background: #f7e8d6;
           color: #3b2a1c;
           display: inline-flex;
           align-items: center;
           justify-content: space-between;
-          gap: 10px;
-          padding: 0 12px;
+          gap: 9px;
+          padding: 0 14px;
           font-weight: 900;
           cursor: pointer;
-          box-shadow: 0 8px 18px rgba(120, 83, 45, 0.1);
+          box-shadow: 0 10px 22px rgba(120, 83, 45, 0.12);
+          opacity: 1;
         }
 
-        .avatarToggleButton:disabled {
-          cursor: not-allowed;
-          opacity: 0.7;
+        .avatarToggleButton:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 14px 28px rgba(120, 83, 45, 0.16);
+        }
+
+        .avatarToggleButton.on {
+          background: #c28a55;
+          color: #ffffff;
+          border-color: rgba(120, 83, 45, 0.28);
         }
 
         .avatarToggleIcon {
           font-size: 18px;
           line-height: 1;
+          flex: 0 0 auto;
+        }
+
+        .avatarToggleText {
+          font-size: 13px;
+          font-weight: 950;
+          flex: 1;
+          text-align: left;
+        }
+
+        .avatarToggleTrack {
+          width: 44px;
+          height: 27px;
+          border-radius: 999px;
+          background: rgba(120, 83, 45, 0.16);
+          position: relative;
+          flex: 0 0 auto;
         }
 
         .avatarToggleKnob {
-          width: 28px;
-          height: 28px;
+          position: absolute;
+          top: 3px;
+          left: 3px;
+          width: 21px;
+          height: 21px;
           border-radius: 50%;
           background: #d9b083;
           border: 1px solid rgba(120, 83, 45, 0.12);
-          box-shadow: 0 2px 8px rgba(120, 83, 45, 0.16);
+          box-shadow: 0 2px 8px rgba(120, 83, 45, 0.18);
+          transition: transform 0.18s ease, background 0.18s ease;
+        }
+
+        .avatarToggleButton.on .avatarToggleTrack {
+          background: rgba(255, 255, 255, 0.32);
         }
 
         .avatarToggleButton.on .avatarToggleKnob {
-          background: #b9824f;
+          transform: translateX(17px);
+          background: #ffffff;
         }
 
         .avatarStatus {
@@ -389,14 +427,14 @@ export default function AvatarPanel({
           align-items: center;
           justify-content: center;
           gap: 8px;
-          font-size: 14px;
+          font-size: 15px;
           color: #4b5563;
-          font-weight: 800;
+          font-weight: 850;
         }
 
         .avatarStatusDot {
-          width: 9px;
-          height: 9px;
+          width: 10px;
+          height: 10px;
           border-radius: 50%;
           background: #64748b;
         }
@@ -500,12 +538,13 @@ export default function AvatarPanel({
 
         .voiceModeStage {
           width: 100%;
-          min-height: 220px;
+          min-height: 260px;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
           gap: 18px;
+          padding: 24px 12px;
         }
 
         .voiceCircle {
@@ -592,10 +631,18 @@ export default function AvatarPanel({
             font-size: 18px;
           }
 
+          .avatarToggleRow {
+            gap: 10px;
+          }
+
           .avatarToggleButton {
-            min-width: 88px;
-            height: 42px;
-            padding: 0 10px;
+            min-width: 132px;
+            height: 50px;
+            padding: 0 12px;
+          }
+
+          .avatarToggleText {
+            font-size: 12px;
           }
 
           .avatarStartButton {
@@ -633,6 +680,15 @@ export default function AvatarPanel({
 
           .avatarStage {
             min-height: 400px;
+          }
+
+          .avatarToggleButton {
+            min-width: 118px;
+            height: 48px;
+          }
+
+          .avatarToggleText {
+            display: none;
           }
         }
       `}</style>
@@ -687,7 +743,21 @@ export default function AvatarPanel({
 
         {isVoiceMode && (
           <div className="voiceModeStage">
-            <div className="voiceCircle">{isListening ? '🎙️' : '🎤'}</div>
+            <div className="voiceCircle">{micActive || isListening ? '🎙️' : '🎤'}</div>
+
+            <button
+              type="button"
+              className={`avatarToggleButton ${micActive || isListening ? 'on' : ''}`}
+              onClick={handleMicClick}
+              title="마이크"
+              aria-label="마이크"
+            >
+              <span className="avatarToggleIcon">🎙️</span>
+              <span className="avatarToggleText">마이크</span>
+              <span className="avatarToggleTrack">
+                <span className="avatarToggleKnob" />
+              </span>
+            </button>
 
             <div className="avatarStatus">
               <span
@@ -695,7 +765,7 @@ export default function AvatarPanel({
                   status === 'speaking' ? 'speaking' : isConnected ? 'connected' : ''
                 }`}
               />
-              <span>{isListening ? '듣는 중' : statusText}</span>
+              <span>{micActive || isListening ? '듣는 중' : statusText}</span>
             </div>
 
             {isIdle ? (
@@ -762,23 +832,29 @@ export default function AvatarPanel({
               <button
                 type="button"
                 className={`avatarToggleButton ${cameraActive ? 'on' : ''}`}
-                onClick={() => onModeChange?.(cameraActive ? 'sts' : 'ftf')}
+                onClick={handleCameraClick}
                 title="카메라"
                 aria-label="카메라"
               >
                 <span className="avatarToggleIcon">📷</span>
-                <span className="avatarToggleKnob" />
+                <span className="avatarToggleText">카메라</span>
+                <span className="avatarToggleTrack">
+                  <span className="avatarToggleKnob" />
+                </span>
               </button>
 
               <button
                 type="button"
-                className={`avatarToggleButton ${isListening ? 'on' : ''}`}
-                disabled
+                className={`avatarToggleButton ${micActive || isListening ? 'on' : ''}`}
+                onClick={handleMicClick}
                 title="마이크"
                 aria-label="마이크"
               >
                 <span className="avatarToggleIcon">🎙️</span>
-                <span className="avatarToggleKnob" />
+                <span className="avatarToggleText">마이크</span>
+                <span className="avatarToggleTrack">
+                  <span className="avatarToggleKnob" />
+                </span>
               </button>
             </div>
 
@@ -788,7 +864,7 @@ export default function AvatarPanel({
                   status === 'speaking' ? 'speaking' : isConnected ? 'connected' : ''
                 }`}
               />
-              <span>{isListening ? '듣는 중' : statusText}</span>
+              <span>{micActive || isListening ? '듣는 중' : statusText}</span>
             </div>
 
             {isIdle || isConnecting ? (
