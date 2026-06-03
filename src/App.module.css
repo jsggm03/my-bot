@@ -13,6 +13,7 @@
 
 /* ─────────────────────────────
    Mind Guard 전체 레이아웃
+   넓은 화면: 대시보드 + 오른쪽 코치
 ───────────────────────────── */
 
 .mindGuardApp {
@@ -99,7 +100,7 @@
 }
 
 /* ─────────────────────────────
-   데스크톱 중간 화면
+   중간 데스크톱
 ───────────────────────────── */
 
 @media (max-width: 1500px) {
@@ -131,35 +132,55 @@
 }
 
 /* ─────────────────────────────
-   작은 노트북 / 좁은 브라우저
-   핵심: 전체 앱 세로 스크롤 허용
+   웹 축소 화면 / 작은 노트북
+   핵심: 최상위 .app부터 스크롤 허용
 ───────────────────────────── */
 
 @media (max-width: 1100px) {
+  .app {
+    height: auto !important;
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    display: block !important;
+  }
+
   .mindGuardApp {
-    height: auto;
-    min-height: 100vh;
-    min-height: 100dvh;
-    display: block;
-    overflow-y: auto;
-    overflow-x: hidden;
+    height: auto !important;
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+    display: block !important;
+    overflow: visible !important;
   }
 
   .mindGuardCoachPanel {
-    height: auto;
-    min-height: 760px;
-    overflow: visible;
+    height: auto !important;
+    min-height: 760px !important;
+    overflow: visible !important;
     border-left: 0;
     border-top: 1px solid rgba(120, 83, 45, 0.14);
   }
 
   .mindGuardAvatarSlot {
-    overflow: visible;
+    overflow: visible !important;
+  }
+
+  .coachTextMode .mindGuardAvatarSlot {
+    flex-basis: 116px;
+  }
+
+  .coachVoiceMode .mindGuardAvatarSlot {
+    flex-basis: 260px;
+  }
+
+  .coachAvatarMode .mindGuardAvatarSlot {
+    flex-basis: 420px;
   }
 
   .mindGuardChatSlot {
-    min-height: 520px;
-    overflow: hidden;
+    min-height: 520px !important;
+    overflow: hidden !important;
   }
 }
 
@@ -168,19 +189,26 @@
 ───────────────────────────── */
 
 @media (max-width: 980px) {
+  .app {
+    height: auto !important;
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
   .mindGuardApp {
-    height: auto;
-    min-height: 100vh;
-    min-height: 100dvh;
-    display: block;
-    overflow-y: auto;
-    overflow-x: hidden;
+    height: auto !important;
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+    display: block !important;
+    overflow: visible !important;
   }
 
   .mindGuardCoachPanel {
-    height: auto;
-    min-height: 760px;
-    overflow: visible;
+    height: auto !important;
+    min-height: 760px !important;
+    overflow: visible !important;
     border-left: 0;
     border-top: 1px solid rgba(120, 83, 45, 0.14);
   }
@@ -198,7 +226,7 @@
   }
 
   .mindGuardChatSlot {
-    min-height: 520px;
+    min-height: 520px !important;
   }
 }
 
@@ -207,17 +235,26 @@
 ───────────────────────────── */
 
 @media (max-width: 640px) {
+  .app {
+    height: auto !important;
+    min-height: 100dvh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    display: block !important;
+  }
+
   .mindGuardApp {
     width: 100%;
-    min-height: 100dvh;
-    display: block;
-    overflow-y: auto;
-    overflow-x: hidden;
+    height: auto !important;
+    min-height: 100dvh !important;
+    display: block !important;
+    overflow: visible !important;
   }
 
   .mindGuardCoachPanel {
-    min-height: 720px;
-    overflow: visible;
+    height: auto !important;
+    min-height: 720px !important;
+    overflow: visible !important;
   }
 
   .coachTextMode .mindGuardAvatarSlot {
@@ -233,14 +270,23 @@
   }
 
   .mindGuardChatSlot {
-    min-height: 500px;
+    min-height: 500px !important;
   }
 }
 
 /* 아주 작은 모바일 */
 @media (max-width: 420px) {
+  .app {
+    height: auto !important;
+    min-height: 100dvh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
   .mindGuardApp {
-    min-height: 100dvh;
+    height: auto !important;
+    min-height: 100dvh !important;
+    overflow: visible !important;
   }
 
   .coachTextMode .mindGuardAvatarSlot {
@@ -256,10 +302,10 @@
   }
 
   .mindGuardCoachPanel {
-    min-height: 700px;
+    min-height: 700px !important;
   }
 
   .mindGuardChatSlot {
-    min-height: 480px;
+    min-height: 480px !important;
   }
 }
