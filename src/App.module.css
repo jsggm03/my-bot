@@ -227,30 +227,85 @@
 
   .rightPane {
     height: auto;
-    min-height: 760px;
-    display: grid;
-    grid-template-rows: auto minmax(520px, 1fr);
+    min-height: 0;
+    display: block;
     overflow: visible;
+    background: #fffaf3;
   }
 
   .avatarSlot {
-    min-height: 500px;
+    height: auto;
+    min-height: 0;
     overflow: visible;
+    border-bottom: 1px solid rgba(120, 83, 45, 0.12);
+  }
+
+  .avatarSlot > * {
+    height: auto !important;
+    min-height: 0 !important;
   }
 
   .chatSlot {
-    min-height: 520px;
+    min-height: 560px;
+    height: auto;
+    display: grid;
+    grid-template-rows: auto minmax(320px, 1fr) auto auto;
+    overflow: visible;
+    background: #fffdf8;
+  }
+
+  .chatBody {
+    min-height: 320px;
+    max-height: none;
+    overflow-y: visible;
+    padding: 18px 18px 24px;
+  }
+
+  .chatInputArea {
+    position: relative;
+    z-index: 2;
   }
 }
 
 @media (max-width: 640px) {
+  .app,
+  .appShell {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .rightPane {
+    width: 100%;
+    overflow: visible;
+  }
+
   .avatarSlot {
-    min-height: 480px;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .avatarSlot > * {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .chatSlot {
+    min-height: 620px;
+    display: grid;
+    grid-template-rows: auto minmax(360px, 1fr) auto auto;
+    overflow: visible;
   }
 
   .chatHeader {
-    padding: 0 10px;
+    min-height: 58px;
+    padding: 0 12px;
     overflow-x: auto;
+    background: #fffdf8;
+  }
+
+  .chatTitle {
+    flex: 0 0 auto;
   }
 
   .chatActions {
@@ -263,12 +318,40 @@
     font-size: 11px;
   }
 
+  .chatBody {
+    min-height: 360px;
+    overflow-y: visible;
+    padding: 16px 16px 24px;
+  }
+
+  .messageBubble {
+    max-width: 94%;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
   .chatInputArea {
-    grid-template-columns: 28px minmax(0, 1fr) 30px;
-    padding: 12px 12px 6px;
+    grid-template-columns: 36px minmax(0, 1fr) 34px;
+    padding: 14px 16px 8px;
+    background: #fffdf8;
+  }
+
+  .listenDot {
+    width: 20px;
+    height: 20px;
   }
 
   .chatInput {
-    font-size: 13px;
+    font-size: 14px;
+    min-height: 46px;
+  }
+
+  .sendButton {
+    font-size: 22px;
+  }
+
+  .chatHelpText {
+    font-size: 11px;
+    padding: 0 12px 14px;
   }
 }
