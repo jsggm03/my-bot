@@ -45,6 +45,13 @@ export default function StockGuardPanel({ onSendToChat }) {
     return n.toLocaleString()
   }
 
+  const formatSignedNumber = (value, suffix = '') => {
+    const n = Number(value)
+    if (!Number.isFinite(n)) return '-'
+    const sign = n > 0 ? '+' : ''
+    return `${sign}${n.toLocaleString()}${suffix}`
+  }
+
   const formatAmountShort = (value) => {
     const n = Number(value)
     if (!Number.isFinite(n)) return '-'
@@ -54,6 +61,13 @@ export default function StockGuardPanel({ onSendToChat }) {
     if (n >= 10000) return `${(n / 10000).toFixed(1)}만`
 
     return n.toLocaleString()
+  }
+
+  const formatSignedAmountShort = (value) => {
+    const n = Number(value)
+    if (!Number.isFinite(n)) return '-'
+    const sign = n > 0 ? '+' : ''
+    return `${sign}${formatAmountShort(Math.abs(n))}`
   }
 
   const formatPercent = (value) => {
@@ -84,6 +98,7 @@ export default function StockGuardPanel({ onSendToChat }) {
         volumeRatio: null,
         flags: [],
         reasonSummary: [],
+        flowSignal: '',
         riskLabels: [
           {
             type: 'neutral',
@@ -114,6 +129,15 @@ export default function StockGuardPanel({ onSendToChat }) {
 
     const latestVolume = Number(current.accumulatedVolume || latest?.volume || 0)
     const volumeRatio = avgVolume20 > 0 ? latestVolume / avgVolume20 : null
+
+    const flowSummary = stockData.flow?.summary
+    const individualNet =
+      flowSummary?.latest?.individual?.netQty ?? flowSummary?.individual?.netQty ?? null
+    const foreignNet =
+      flowSummary?.latest?.foreign?.netQty ?? flowSummary?.foreign?.netQty ?? null
+    const institutionNet =
+      flowSummary?.latest?.institution?.netQty ?? flowSummary?.institution?.netQty ?? null
+    const flowSignal = flowSummary?.signal || ''
 
     const flags = []
     const reasonSummary = []
@@ -161,6 +185,11 @@ export default function StockGuardPanel({ onSendToChat }) {
     if (volumeRatio !== null && volumeRatio < 0.7) {
       flags.push('거래량 둔화')
       reasonSummary.push('거래량이 약하면 가격 움직임의 신뢰도를 더 조심해서 봐야 합니다.')
+    }
+
+    if (flowSignal) {
+      flags.push(flowSignal)
+      reasonSummary.push(`수급 기준으로는 '${flowSignal}' 상태입니다.`)
     }
 
     const avgPrice = Number(form.averagePrice)
@@ -231,6 +260,31 @@ export default function StockGuardPanel({ onSendToChat }) {
       })
     }
 
+    if (
+      form.action === '더 살까?' &&
+      individualNet > 0 &&
+      foreignNet < 0 &&
+      institutionNet < 0
+    ) {
+      riskLabels.push({
+        type: 'warning',
+        title: '개인 매수 쏠림 주의',
+        desc: '개인은 사고 외국인·기관은 파는 흐름일 수 있어 추격매수 판단을 더 조심해야 합니다.'
+      })
+    }
+
+    if (
+      form.action === '팔까?' &&
+      individualNet < 0 &&
+      (foreignNet > 0 || institutionNet > 0)
+    ) {
+      riskLabels.push({
+        type: 'neutral',
+        title: '공포 매도 점검',
+        desc: '개인은 팔고 일부 큰 수급은 들어오는 흐름일 수 있어 감정 매도인지 확인이 필요합니다.'
+      })
+    }
+
     if (riskLabels.length === 0) {
       riskLabels.push({
         type: 'neutral',
@@ -246,6 +300,7 @@ export default function StockGuardPanel({ onSendToChat }) {
       volumeRatio,
       flags,
       reasonSummary,
+      flowSignal,
       riskLabels
     }
   }, [stockData, form.action, form.emotion, form.averagePrice, form.currentPrice])
@@ -389,7 +444,8 @@ export default function StockGuardPanel({ onSendToChat }) {
   const buildDataSummary = () => {
     if (!stockData?.summary) return '주가 데이터: 아직 불러오지 않음'
 
-    const { stock, current, summary } = stockData
+    const { stock, current, summary, flow } = stockData
+    const flowSummary = flow?.summary
 
     return `
 [주가 데이터]
@@ -412,6 +468,25 @@ export default function StockGuardPanel({ onSendToChat }) {
 - 감지 신호: ${
       marketDiagnostics.flags.length > 0 ? marketDiagnostics.flags.join(', ') : '뚜렷한 신호 없음'
     }
+
+[수급 데이터]
+- 수급 기준일: ${flowSummary?.latestDate || '정보 없음'}
+- 개인 순매수: ${
+      flowSummary?.individual?.netQty !== undefined
+        ? `${flowSummary.individual.netQty}주`
+        : '정보 없음'
+    }
+- 외국인 순매수: ${
+      flowSummary?.foreign?.netQty !== undefined
+        ? `${flowSummary.foreign.netQty}주`
+        : '정보 없음'
+    }
+- 기관 순매수: ${
+      flowSummary?.institution?.netQty !== undefined
+        ? `${flowSummary.institution.netQty}주`
+        : '정보 없음'
+    }
+- 수급 해석: ${flowSummary?.signal || '정보 없음'}
 `.trim()
   }
 
@@ -460,7 +535,7 @@ export default function StockGuardPanel({ onSendToChat }) {
 
     const message = `
 너는 Mind-Guard의 금융 심리 케어 챗봇 '숨돌이'야.
-아래 사용자의 투자 상황, 주가 데이터, 앱 계산 결과, 위험 라벨, 원인 후보를 바탕으로 지금 행동이 원칙 매매인지 감정 매매인지 점검해줘.
+아래 사용자의 투자 상황, 주가 데이터, 수급 데이터, 앱 계산 결과, 위험 라벨, 원인 후보를 바탕으로 지금 행동이 원칙 매매인지 감정 매매인지 점검해줘.
 
 [사용자 입력]
 - 종목명: ${form.stockName || '미입력'}
@@ -485,10 +560,11 @@ ${buildAnalysisSummary()}
 - 600~900자 이내로 답변해.
 - 6~8문장 이하로 답변해.
 - 첫 문장은 사용자의 감정을 인정하는 문장으로 시작해.
-- 현재 손익률, 손절 기준 도달 여부, 최근 20거래일 흐름, 고점 대비 하락률, 추가매수 후 평단, 위험 라벨을 반드시 고려해.
+- 현재 손익률, 손절 기준 도달 여부, 최근 20거래일 흐름, 고점 대비 하락률, 추가매수 후 평단, 위험 라벨, 수급 해석을 반드시 고려해.
 - 매수/매도하라고 직접 지시하지 마.
 - 특정 결과를 예측하지 말고, 현재 데이터가 보여주는 위험과 점검 포인트를 설명해.
 - 상승/하락의 원인을 단정하지 말고, 확인해야 할 원인 후보로 표현해.
+- 수급 데이터도 확정 원인이 아니라 보조지표라고 설명해.
 - 답변 마지막에는 사용자가 바로 생각할 수 있는 확인 질문 1개만 던져.
 `.trim()
 
@@ -1066,7 +1142,9 @@ ${buildAnalysisSummary()}
                 marketDiagnostics={marketDiagnostics}
                 formatWon={formatWon}
                 formatNumber={formatNumber}
+                formatSignedNumber={formatSignedNumber}
                 formatAmountShort={formatAmountShort}
+                formatSignedAmountShort={formatSignedAmountShort}
               />
             </section>
           )}
@@ -1135,10 +1213,15 @@ function DetailPanel({
   marketDiagnostics,
   formatWon,
   formatNumber,
-  formatAmountShort
+  formatSignedNumber,
+  formatAmountShort,
+  formatSignedAmountShort
 }) {
   const summary = stockData.summary
   const current = stockData.current || {}
+  const flow = stockData.flow
+  const flowError = stockData.flowError
+  const flowSummary = flow?.summary
 
   if (activeDetail === 'why') {
     return (
@@ -1162,6 +1245,10 @@ function DetailPanel({
                 : '거래량 평균 대비 배율은 아직 계산되지 않았습니다.'
             }
           />
+          <MiniInsightCard
+            title="수급 신호"
+            text={flowSummary?.signal || '수급 데이터 확인 대기 중입니다.'}
+          />
         </div>
 
         <ul className="detailList" style={{ marginTop: '12px' }}>
@@ -1179,29 +1266,94 @@ function DetailPanel({
         </ul>
 
         <p style={safeNoticeStyle}>
-          상승·하락의 확정 원인이 아니라, 매매 전 확인해야 할 가격·거래량 기반 원인 후보입니다.
+          상승·하락의 확정 원인이 아니라, 매매 전 확인해야 할 가격·거래량·수급 기반 원인 후보입니다.
         </p>
       </div>
     )
   }
 
   if (activeDetail === 'flow') {
+    if (!flowSummary) {
+      return (
+        <div className="detailPanel">
+          <p className="detailPanelTitle">수급 보기</p>
+          <ul className="detailList">
+            <li>수급 데이터를 아직 불러오지 못했습니다.</li>
+            {flowError && <li>오류 메시지: {flowError}</li>}
+            <li>현재 버전에서는 가격·거래량 중심으로 먼저 판단합니다.</li>
+          </ul>
+          <p style={safeNoticeStyle}>
+            수급 데이터는 매수·매도 추천이 아니라, 개인·외국인·기관의 매매 쏠림을 확인하는 보조지표입니다.
+          </p>
+        </div>
+      )
+    }
+
+    const latest = flowSummary.latest || {
+      individual: flowSummary.individual,
+      foreign: flowSummary.foreign,
+      institution: flowSummary.institution
+    }
+
     return (
       <div className="detailPanel">
-        <p className="detailPanelTitle">수급 보기 — 다음 고도화 예정</p>
+        <p className="detailPanelTitle">
+          수급 보기 — 개인·외국인·기관 흐름
+          {flowSummary.latestDate ? ` (${flowSummary.latestDate})` : ''}
+        </p>
+
         <div className="miniGrid">
-          <MiniInsightCard title="개인" text="개인 순매수·순매도 흐름을 확인할 예정입니다." />
-          <MiniInsightCard title="외국인" text="외국인 순매수·순매도 방향을 확인할 예정입니다." />
-          <MiniInsightCard title="기관" text="기관 매매 흐름과 수급 쏠림을 확인할 예정입니다." />
+          <MiniInsightCard
+            title="개인 순매수"
+            text={formatSignedNumber(latest.individual?.netQty, '주')}
+          />
+          <MiniInsightCard
+            title="외국인 순매수"
+            text={formatSignedNumber(latest.foreign?.netQty, '주')}
+          />
+          <MiniInsightCard
+            title="기관 순매수"
+            text={formatSignedNumber(latest.institution?.netQty, '주')}
+          />
+          <MiniInsightCard
+            title="수급 해석"
+            text={flowSummary.signal || '수급 데이터 확인 필요'}
+          />
         </div>
+
+        <div className="miniGrid">
+          <MiniInsightCard
+            title="최근 5일 개인"
+            text={formatSignedNumber(flowSummary.recent5?.individual?.netQty, '주')}
+          />
+          <MiniInsightCard
+            title="최근 5일 외국인"
+            text={formatSignedNumber(flowSummary.recent5?.foreign?.netQty, '주')}
+          />
+          <MiniInsightCard
+            title="최근 5일 기관"
+            text={formatSignedNumber(flowSummary.recent5?.institution?.netQty, '주')}
+          />
+          <MiniInsightCard
+            title="최근 20일 외국인"
+            text={formatSignedNumber(flowSummary.recent20?.foreign?.netQty, '주')}
+          />
+        </div>
+
         <ul className="detailList" style={{ marginTop: '12px' }}>
-          <li>개인 매수 쏠림 여부</li>
-          <li>외국인·기관 동반 매수 또는 동반 매도 여부</li>
-          <li>프로그램 매매, 신용잔고, 공매도 추이</li>
-          <li>수급 데이터는 매수·매도 추천이 아니라 과열·공포 판단 보조지표로 사용할 예정입니다.</li>
+          <li>
+            개인 순매수가 강하고 외국인·기관이 함께 매도하면 개인 매수 쏠림 가능성을 확인합니다.
+          </li>
+          <li>
+            외국인과 기관이 함께 매수하면 수급은 우호적으로 볼 수 있지만, 가격이 이미 고점권인지도 같이 봐야 합니다.
+          </li>
+          <li>
+            수급이 혼조일 때는 가격 흐름만 보고 단정하기보다 공시·뉴스와 거래량을 함께 확인해야 합니다.
+          </li>
         </ul>
+
         <p style={safeNoticeStyle}>
-          현재 버전에서는 수급을 단정하지 않고, 가격·거래량 중심으로 먼저 점검합니다.
+          수급은 상승·하락의 확정 원인이 아니라, 추격매수나 패닉셀을 막기 위한 확인 지표입니다.
         </p>
       </div>
     )
@@ -1270,6 +1422,18 @@ function DetailPanel({
               ? `${marketDiagnostics.volumeRatio.toFixed(2)}배`
               : '-'
           }
+        />
+        <MiniInsightCard
+          title="개인 순매수"
+          text={formatSignedNumber(flowSummary?.individual?.netQty, '주')}
+        />
+        <MiniInsightCard
+          title="외국인 순매수"
+          text={formatSignedNumber(flowSummary?.foreign?.netQty, '주')}
+        />
+        <MiniInsightCard
+          title="기관 순매수"
+          text={formatSignedNumber(flowSummary?.institution?.netQty, '주')}
         />
       </div>
     </div>
