@@ -457,3 +457,22 @@
     border: 1px solid rgba(120, 83, 45, 0.22) !important;
   }
 }
+
+:global(.avatarStartButton) {
+  opacity: 1 !important;
+  background: #b9824f !important;
+  color: #ffffff !important;
+  border-color: rgba(120, 83, 45, 0.25) !important;
+  box-shadow: 0 12px 28px rgba(120, 83, 45, 0.22) !important;
+}
+
+:global(.avatarStartButton:disabled) {
+  opacity: 0.82 !important;
+  background: #c28a55 !important;
+  color: #ffffff !important;
+}
+
+:global(.avatarStartButton *) {
+  color: #ffffff !important;
+  fill: #ffffff !important;
+}
