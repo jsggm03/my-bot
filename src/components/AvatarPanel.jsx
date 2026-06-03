@@ -7,6 +7,7 @@ export default function AvatarPanel({
   vrmAvatarRef,
   onAvatarReady,
   userVideoRef,
+  videoReady = false,
   cameraActive = false,
   micActive = false,
   onCameraToggle,
@@ -118,11 +119,13 @@ export default function AvatarPanel({
       <style>{`
         .avatarPanel {
           width: 100%;
-          min-height: 100%;
+          height: 100%;
+          min-height: 0;
           background: #fffaf3;
           color: #2f2418;
           display: flex;
           flex-direction: column;
+          overflow: hidden;
         }
 
         .avatarTopBar {
@@ -130,10 +133,13 @@ export default function AvatarPanel({
           align-items: center;
           justify-content: flex-end;
           gap: 8px;
-          padding: 12px 14px 8px;
+          padding: 12px 14px 10px;
           border-bottom: 1px solid rgba(120, 83, 45, 0.1);
           background: #fffdf8;
           overflow-x: auto;
+          flex: 0 0 auto;
+          position: relative;
+          z-index: 5;
         }
 
         .avatarModeButton {
@@ -154,16 +160,23 @@ export default function AvatarPanel({
           border-color: #3b2a1c;
         }
 
+        .avatarModeButton:disabled {
+          cursor: not-allowed;
+          opacity: 0.55;
+        }
+
         .avatarStage {
-          flex: 1;
+          flex: 1 1 auto;
           min-height: 0;
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: center;
-          padding: 20px 16px 24px;
+          justify-content: flex-start;
+          padding: 24px 16px 28px;
           gap: 16px;
           background: #fffaf3;
+          overflow-y: auto;
+          overflow-x: hidden;
         }
 
         .avatarCards {
@@ -174,11 +187,12 @@ export default function AvatarPanel({
           align-items: stretch;
           justify-content: center;
           max-width: 660px;
+          flex: 0 0 auto;
         }
 
         .avatarCard {
           position: relative;
-          height: 280px;
+          height: 260px;
           border-radius: 24px;
           background: #d5b48d;
           overflow: hidden;
@@ -308,7 +322,7 @@ export default function AvatarPanel({
         }
 
         .camCard {
-          height: 280px;
+          height: 260px;
           border-radius: 24px;
           background: #ecd5ad;
           border: 1px solid rgba(120, 83, 45, 0.16);
@@ -347,6 +361,7 @@ export default function AvatarPanel({
           justify-content: center;
           gap: 14px;
           flex-wrap: wrap;
+          flex: 0 0 auto;
         }
 
         .avatarToggleButton {
@@ -430,6 +445,7 @@ export default function AvatarPanel({
           font-size: 15px;
           color: #4b5563;
           font-weight: 850;
+          flex: 0 0 auto;
         }
 
         .avatarStatusDot {
@@ -466,6 +482,7 @@ export default function AvatarPanel({
           justify-content: center;
           gap: 10px;
           opacity: 1;
+          flex: 0 0 auto;
         }
 
         .avatarStartButton:disabled {
@@ -515,36 +532,41 @@ export default function AvatarPanel({
         }
 
         .textModeCompact {
+          flex: 1 1 auto;
+          min-height: 0;
           width: 100%;
-          min-height: 96px;
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           justify-content: space-between;
           gap: 12px;
-          padding: 12px 18px;
+          padding: 38px 18px;
+          box-sizing: border-box;
         }
 
         .textModeTitle {
-          font-size: 15px;
+          font-size: 17px;
           font-weight: 950;
           color: #3b2a1c;
         }
 
         .textModeSub {
-          margin-top: 4px;
-          font-size: 12px;
+          margin-top: 6px;
+          font-size: 14px;
           color: #8a6a4a;
         }
 
         .voiceModeStage {
+          flex: 1 1 auto;
           width: 100%;
-          min-height: 260px;
+          min-height: 0;
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: center;
+          justify-content: flex-start;
           gap: 18px;
-          padding: 24px 12px;
+          padding: 42px 12px 24px;
+          box-sizing: border-box;
+          overflow-y: auto;
         }
 
         .voiceCircle {
