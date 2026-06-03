@@ -28,7 +28,7 @@
   min-height: 0;
   height: 100%;
   display: grid;
-  grid-template-rows: 540px minmax(0, 1fr);
+  grid-template-rows: 430px minmax(0, 1fr);
   background: #fffaf3;
   overflow: hidden;
 }
@@ -201,7 +201,20 @@
   fill: #ffffff !important;
 }
 
-/* 창이 900px 이하로 좁아지면 세로 배치 + 전체 휠 스크롤 */
+/* 낮은 높이의 웹 화면에서는 아바타 영역을 조금 더 줄여서 대화창 확보 */
+@media (min-width: 901px) and (max-height: 820px) {
+  .rightPane {
+    grid-template-rows: 390px minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 901px) and (max-height: 720px) {
+  .rightPane {
+    grid-template-rows: 350px minmax(0, 1fr);
+  }
+}
+
+/* 창이 900px 이하로 좁아지면 세로 배치 + 전체 스크롤 */
 @media (max-width: 900px) {
   .app,
   .appShell {
