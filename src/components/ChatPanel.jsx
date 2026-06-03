@@ -1,255 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 
-const chatPanelCss = `
-.chatPanelRoot {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
-  background: #fffdf8;
-  overflow: hidden;
-}
-
-.chatPanelHeader {
-  min-height: 58px;
-  padding: 0 18px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border-bottom: 1px solid rgba(120, 83, 45, 0.12);
-  background: #fffdf8;
-}
-
-.chatPanelTitle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #3b2a1c;
-  font-size: 15px;
-  font-weight: 900;
-  white-space: nowrap;
-}
-
-.chatPanelActions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  min-width: 0;
-  overflow-x: auto;
-}
-
-.chatPanelSmallButton,
-.chatPanelUserButton {
-  border: 1px solid rgba(160, 128, 96, 0.28);
-  border-radius: 9px;
-  background: #fffaf3;
-  color: #5b3d25;
-  padding: 7px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.chatPanelUserButton {
-  border-color: transparent;
-  background: transparent;
-  font-weight: 800;
-}
-
-.chatPanelBody {
-  min-height: 0;
-  height: 100%;
-  overflow-y: auto;
-  padding: 20px 18px;
-  background: #fffdf8;
-}
-
-.chatPanelEmpty {
-  height: 100%;
-  min-height: 180px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  color: #b8a38e;
-  font-size: 14px;
-  line-height: 1.6;
-  padding-top: 8px;
-}
-
-.chatPanelMessage {
-  max-width: 88%;
-  padding: 12px 14px;
-  border-radius: 16px;
-  font-size: 14px;
-  line-height: 1.65;
-  margin-bottom: 12px;
-  white-space: pre-wrap;
-  word-break: keep-all;
-  overflow-wrap: anywhere;
-}
-
-.chatPanelMessage.user {
-  margin-left: auto;
-  background: #3b2a1c;
-  color: #ffffff;
-  border-bottom-right-radius: 6px;
-}
-
-.chatPanelMessage.assistant {
-  margin-right: auto;
-  background: #fff7ed;
-  color: #3b2a1c;
-  border: 1px solid rgba(120, 83, 45, 0.12);
-  border-bottom-left-radius: 6px;
-}
-
-.chatPanelMessage.loading {
-  opacity: 0.75;
-}
-
-.chatPanelInputArea {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 36px;
-  gap: 10px;
-  align-items: center;
-  padding: 14px 18px 8px;
-  border-top: 1px solid rgba(120, 83, 45, 0.12);
-  background: #fffdf8;
-}
-
-.chatPanelMicButton {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 2px solid #9a6b45;
-  box-shadow: inset 0 0 0 4px #fffdf8;
-  background: #0f172a;
-  cursor: pointer;
-  justify-self: center;
-}
-
-.chatPanelMicButton.on {
-  background: #ef4444;
-  border-color: #ef4444;
-  box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.14);
-}
-
-.chatPanelMicButton:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.chatPanelInput {
-  width: 100%;
-  min-height: 46px;
-  max-height: 120px;
-  resize: vertical;
-  border: 1px solid rgba(160, 128, 96, 0.2);
-  border-radius: 14px;
-  padding: 12px 14px;
-  font-size: 14px;
-  line-height: 1.5;
-  outline: none;
-  color: #3b2a1c;
-  background: #fffaf3;
-  box-sizing: border-box;
-  font-family: inherit;
-}
-
-.chatPanelInput::placeholder {
-  color: #b8a38e;
-}
-
-.chatPanelSendButton {
-  border: 0;
-  background: transparent;
-  color: #3b2a1c;
-  font-size: 24px;
-  cursor: pointer;
-  line-height: 1;
-}
-
-.chatPanelSendButton:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.chatPanelHelpText {
-  text-align: center;
-  color: #8a6a4a;
-  font-size: 12px;
-  padding: 0 12px 12px;
-  background: #fffdf8;
-}
-
-@media (max-width: 900px) {
-  .chatPanelRoot {
-    height: 100dvh;
-    min-height: 640px;
-  }
-
-  .chatPanelBody {
-    min-height: 0;
-    overflow-y: auto;
-  }
-}
-
-@media (max-width: 640px) {
-  .chatPanelRoot {
-    height: 100dvh;
-    min-height: 640px;
-  }
-
-  .chatPanelHeader {
-    min-height: 58px;
-    padding: 0 12px;
-  }
-
-  .chatPanelActions {
-    gap: 6px;
-  }
-
-  .chatPanelSmallButton,
-  .chatPanelUserButton {
-    padding: 6px 8px;
-    font-size: 11px;
-  }
-
-  .chatPanelBody {
-    padding: 16px;
-  }
-
-  .chatPanelEmpty {
-    min-height: 260px;
-    align-items: flex-start;
-  }
-
-  .chatPanelMessage {
-    max-width: 94%;
-    font-size: 13px;
-    line-height: 1.55;
-  }
-
-  .chatPanelInputArea {
-    grid-template-columns: 36px minmax(0, 1fr) 34px;
-    padding: 14px 16px 8px;
-  }
-
-  .chatPanelInput {
-    font-size: 14px;
-    min-height: 46px;
-  }
-
-  .chatPanelHelpText {
-    font-size: 11px;
-    padding-bottom: 14px;
-  }
-}
-`
-
 export default function ChatPanel({
   messages = [],
   isProcessing = false,
@@ -296,103 +46,306 @@ export default function ChatPanel({
       : '궁금한 점을 입력하세요...'
     : '먼저 왼쪽의 [대화 시작] 버튼을 눌러주세요'
 
+  const userName = user?.name || user?.nickname || '김정민님'
+
   return (
-    <>
-      <style dangerouslySetInnerHTML={{ __html: chatPanelCss }} />
+    <section style={styles.root}>
+      <header style={styles.header}>
+        <div style={styles.title}>
+          <span>💬</span>
+          <span>대화</span>
+        </div>
 
-      <section className="chatPanelRoot">
-        <header className="chatPanelHeader">
-          <div className="chatPanelTitle">
-            <span>💬</span>
-            <span>대화</span>
-          </div>
+        <div style={styles.actions}>
+          <button type="button" style={styles.smallButton} onClick={onToggleTheme}>
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
 
-          <div className="chatPanelActions">
-            <button type="button" className="chatPanelSmallButton" onClick={onToggleTheme}>
-              {theme === 'dark' ? '☀️' : '🌙'}
-            </button>
+          <button type="button" style={styles.smallButton} onClick={onOpenSurvey}>
+            설문
+          </button>
 
-            <button type="button" className="chatPanelSmallButton" onClick={onOpenSurvey}>
-              설문
-            </button>
-
-            {user ? (
-              <>
-                <button type="button" className="chatPanelUserButton">
-                  {user.name || user.nickname || '김정민님'}
-                </button>
-
-                <button type="button" className="chatPanelSmallButton" onClick={onLogout}>
-                  로그아웃
-                </button>
-              </>
-            ) : (
-              <button type="button" className="chatPanelSmallButton" onClick={onLoginClick}>
-                로그인
+          {user ? (
+            <>
+              <button type="button" style={styles.userButton}>
+                {userName}
               </button>
-            )}
-          </div>
-        </header>
 
-        <main ref={bodyRef} className="chatPanelBody">
-          {messages.length === 0 ? (
-            <div className="chatPanelEmpty">
-              {connected
-                ? '궁금한 점을 입력하거나 마이크 버튼을 눌러 말해보세요.'
-                : '먼저 왼쪽의 [대화 시작] 버튼을 눌러주세요'}
-            </div>
+              <button type="button" style={styles.smallButton} onClick={onLogout}>
+                로그아웃
+              </button>
+            </>
           ) : (
-            messages.map((message, index) => (
+            <button type="button" style={styles.smallButton} onClick={onLoginClick}>
+              로그인
+            </button>
+          )}
+        </div>
+      </header>
+
+      <main ref={bodyRef} style={styles.body}>
+        {messages.length === 0 ? (
+          <div style={styles.empty}>
+            {connected
+              ? '궁금한 점을 입력하거나 마이크 버튼을 눌러 말해보세요.'
+              : '먼저 왼쪽의 [대화 시작] 버튼을 눌러주세요'}
+          </div>
+        ) : (
+          messages.map((message, index) => {
+            const isUser = message.role === 'user'
+            const text = message.text || message.content || ''
+
+            return (
               <div
                 key={`${message.role}-${index}`}
-                className={`chatPanelMessage ${message.role === 'user' ? 'user' : 'assistant'}`}
+                style={{
+                  ...styles.message,
+                  ...(isUser ? styles.userMessage : styles.assistantMessage)
+                }}
               >
-                {message.text || message.content || ''}
+                {text}
               </div>
-            ))
-          )}
+            )
+          })
+        )}
 
-          {isProcessing && (
-            <div className="chatPanelMessage assistant loading">
-              답변을 준비하고 있어요...
-            </div>
-          )}
-        </main>
+        {isProcessing && (
+          <div style={{ ...styles.message, ...styles.assistantMessage, opacity: 0.75 }}>
+            답변을 준비하고 있어요...
+          </div>
+        )}
+      </main>
 
-        <div className="chatPanelInputArea">
-          <button
-            type="button"
-            className={`chatPanelMicButton ${micEnabled || isListening ? 'on' : ''}`}
-            onClick={onToggleMic}
-            disabled={!micAvailable}
-            aria-label="마이크"
-            title={micAvailable ? '마이크' : '텍스트 모드에서는 마이크를 사용할 수 없습니다.'}
-          />
+      <div style={styles.inputArea}>
+        <button
+          type="button"
+          onClick={onToggleMic}
+          disabled={!micAvailable}
+          aria-label="마이크"
+          title={micAvailable ? '마이크' : '텍스트 모드에서는 마이크를 사용할 수 없습니다.'}
+          style={{
+            ...styles.micButton,
+            ...((micEnabled || isListening) ? styles.micButtonOn : {}),
+            ...(!micAvailable ? styles.disabledButton : {})
+          }}
+        />
 
-          <textarea
-            className="chatPanelInput"
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={placeholder}
-            disabled={!connected || isProcessing}
-          />
+        <textarea
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          disabled={!connected || isProcessing}
+          style={{
+            ...styles.input,
+            ...(!connected || isProcessing ? styles.disabledInput : {})
+          }}
+        />
 
-          <button
-            type="button"
-            className="chatPanelSendButton"
-            onClick={handleSend}
-            disabled={!connected || isProcessing || !input.trim()}
-            aria-label="전송"
-          >
-            ↑
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleSend}
+          disabled={!connected || isProcessing || !input.trim()}
+          aria-label="전송"
+          style={{
+            ...styles.sendButton,
+            ...(!connected || isProcessing || !input.trim() ? styles.disabledSendButton : {})
+          }}
+        >
+          ↑
+        </button>
+      </div>
 
-        <div className="chatPanelHelpText">
-          Enter로 전송 · Shift+Enter 줄바꿈 · ● 누르면 듣기 시작
-        </div>
-      </section>
-    </>
+      <div style={styles.helpText}>
+        Enter로 전송 · Shift+Enter 줄바꿈 · ● 누르면 듣기 시작
+      </div>
+    </section>
   )
+}
+
+const styles = {
+  root: {
+    width: '100%',
+    height: '100%',
+    minHeight: 0,
+    display: 'grid',
+    gridTemplateRows: 'auto minmax(0, 1fr) auto auto',
+    background: '#fffdf8',
+    overflow: 'hidden'
+  },
+
+  header: {
+    minHeight: 58,
+    padding: '0 18px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    borderBottom: '1px solid rgba(120, 83, 45, 0.12)',
+    background: '#fffdf8'
+  },
+
+  title: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    color: '#3b2a1c',
+    fontSize: 15,
+    fontWeight: 900,
+    whiteSpace: 'nowrap'
+  },
+
+  actions: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+    minWidth: 0,
+    overflowX: 'auto'
+  },
+
+  smallButton: {
+    border: '1px solid rgba(160, 128, 96, 0.28)',
+    borderRadius: 9,
+    background: '#fffaf3',
+    color: '#5b3d25',
+    padding: '7px 10px',
+    fontSize: 12,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap'
+  },
+
+  userButton: {
+    border: '1px solid transparent',
+    borderRadius: 9,
+    background: 'transparent',
+    color: '#5b3d25',
+    padding: '7px 10px',
+    fontSize: 12,
+    cursor: 'default',
+    whiteSpace: 'nowrap',
+    fontWeight: 800
+  },
+
+  body: {
+    minHeight: 0,
+    height: '100%',
+    overflowY: 'auto',
+    padding: '20px 18px',
+    background: '#fffdf8'
+  },
+
+  empty: {
+    height: '100%',
+    minHeight: 180,
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    color: '#b8a38e',
+    fontSize: 14,
+    lineHeight: 1.6,
+    paddingTop: 8
+  },
+
+  message: {
+    maxWidth: '88%',
+    padding: '12px 14px',
+    borderRadius: 16,
+    fontSize: 14,
+    lineHeight: 1.65,
+    marginBottom: 12,
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'keep-all',
+    overflowWrap: 'anywhere'
+  },
+
+  userMessage: {
+    marginLeft: 'auto',
+    background: '#3b2a1c',
+    color: '#ffffff',
+    borderBottomRightRadius: 6
+  },
+
+  assistantMessage: {
+    marginRight: 'auto',
+    background: '#fff7ed',
+    color: '#3b2a1c',
+    border: '1px solid rgba(120, 83, 45, 0.12)',
+    borderBottomLeftRadius: 6
+  },
+
+  inputArea: {
+    display: 'grid',
+    gridTemplateColumns: '34px minmax(0, 1fr) 36px',
+    gap: 10,
+    alignItems: 'center',
+    padding: '14px 18px 8px',
+    borderTop: '1px solid rgba(120, 83, 45, 0.12)',
+    background: '#fffdf8'
+  },
+
+  micButton: {
+    width: 22,
+    height: 22,
+    borderRadius: '50%',
+    border: '2px solid #9a6b45',
+    boxShadow: 'inset 0 0 0 4px #fffdf8',
+    background: '#0f172a',
+    cursor: 'pointer',
+    justifySelf: 'center'
+  },
+
+  micButtonOn: {
+    background: '#ef4444',
+    borderColor: '#ef4444',
+    boxShadow: '0 0 0 6px rgba(239, 68, 68, 0.14)'
+  },
+
+  disabledButton: {
+    cursor: 'not-allowed',
+    opacity: 0.45
+  },
+
+  input: {
+    width: '100%',
+    minHeight: 46,
+    maxHeight: 120,
+    resize: 'vertical',
+    border: '1px solid rgba(160, 128, 96, 0.2)',
+    borderRadius: 14,
+    padding: '12px 14px',
+    fontSize: 14,
+    lineHeight: 1.5,
+    outline: 'none',
+    color: '#3b2a1c',
+    background: '#fffaf3',
+    boxSizing: 'border-box',
+    fontFamily: 'inherit'
+  },
+
+  disabledInput: {
+    opacity: 0.8
+  },
+
+  sendButton: {
+    border: 0,
+    background: 'transparent',
+    color: '#3b2a1c',
+    fontSize: 24,
+    cursor: 'pointer',
+    lineHeight: 1
+  },
+
+  disabledSendButton: {
+    opacity: 0.35,
+    cursor: 'not-allowed'
+  },
+
+  helpText: {
+    textAlign: 'center',
+    color: '#8a6a4a',
+    fontSize: 12,
+    padding: '0 12px 12px',
+    background: '#fffdf8'
+  }
 }
