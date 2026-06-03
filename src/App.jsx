@@ -10,17 +10,15 @@ import { MicRecorder, isMicRecorderSupported } from './lib/stt'
 // cha-bot-starter-kit
 // ─────────────────────────────────────────────────────────────
 // VRoid VRM (browser-rendered via three-vrm) + streaming chat +
-// voice (STT/TTS).
-//
-// Three conversation modes:
-// ftf : face-to-face (avatar + camera + voice)
-// sts : speech-to-speech (avatar + voice, no camera)
-// ttt : text-to-text (text-only, no avatar/mic)
+// voice (STT/TTS). Three conversation modes:
+//   ftf : face-to-face (avatar + camera + voice)
+//   sts : speech-to-speech (avatar + voice, no camera)
+//   ttt : text-to-text (text-only, no avatar/mic)
 //
 // Backend endpoints (Vercel serverless, see /api):
-// /api/chat-stream SSE LLM stream
-// /api/tts         text → audio
-// /api/stt         audio → text
+//   /api/chat-stream   SSE LLM stream
+//   /api/tts           text → audio
+//   /api/stt           audio → text
 //
 // All three proxy to your on-premise server (configure in .env).
 
@@ -37,7 +35,7 @@ function normalizeTtsText(text) {
   if (!text) return ''
 
   return String(text)
-    .replace(/[🚀🤖🎙️💬✨▶■◉]/g, '')
+    .replace(/🌬️|✨|▶|■|◉/g, '')
     .replace(/\bAI\b/gi, '에이아이')
     .replace(/\bGPT\b/gi, '지피티')
     .replace(/\bAPI\b/gi, '에이피아이')
@@ -47,13 +45,13 @@ function normalizeTtsText(text) {
 }
 
 export default function App() {
-  const [status, setStatus] = useState('idle')
+  const [status, setStatus] = useState('idle') // idle | connecting | connected | speaking
   const [messages, setMessages] = useState([])
   const [isProcessing, setIsProcessing] = useState(false)
   const [videoReady, setVideoReady] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [autoListen, setAutoListen] = useState(false)
-  const [conversationMode, setConversationMode] = useState('ftf')
+  const [conversationMode, setConversationMode] = useState('ftf') // ftf | sts | ttt
   const [cameraStream, setCameraStream] = useState(null)
   const [user, setUser] = useState(getUser())
   const [authOpen, setAuthOpen] = useState(() => !getUser())
@@ -61,29 +59,6 @@ export default function App() {
     if (typeof window === 'undefined') return 'light'
     return localStorage.getItem('theme') === 'dark' ? 'dark' : 'light'
   })
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('theme', theme)
-  }, [theme])
-
-  useEffect(() => {
-    verifyToken().then((u) => {
-      if (u) {
-        setUser(u)
-        setAuthOpen(false)
-      }
-    })
-  }, [])
-
-  const handleLogout = () => {
-    clearAuth()
-    setUser(null)
-  }
-
-  const toggleTheme = useCallback(() => {
-    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))
-  }, [])
 
   const vrmAvatarRef = useRef(null)
   const sessionRef = useRef(null)
@@ -106,8 +81,31 @@ export default function App() {
   const echoResumeTimerRef = useRef(null)
   const lastSubmittedSpeechRef = useRef({ key: '', at: 0 })
 
-  const handleAvatarReady = useCallback(() => {
-    setVideoReady(true)
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
+  useEffect(() => {
+    verifyToken().then((u) => {
+      if (u) {
+        setUser(u)
+        setAuthOpen(false)
+      }
+    })
+  }, [])
+
+  // 모바일/웹 축소 화면에서 새로고침 시 대화창으로 바로 내려가는 것 방지
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual'
+    }
+
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: 'auto'
+    })
   }, [])
 
   useEffect(() => {
@@ -135,6 +133,19 @@ export default function App() {
       userVideoRef.current.srcObject = cameraStream || null
     }
   }, [cameraStream])
+
+  const handleLogout = () => {
+    clearAuth()
+    setUser(null)
+  }
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))
+  }, [])
+
+  const handleAvatarReady = useCallback(() => {
+    setVideoReady(true)
+  }, [])
 
   const stopUserCamera = useCallback(() => {
     if (cameraStreamRef.current) {
@@ -182,7 +193,6 @@ export default function App() {
 
       cameraStreamRef.current = stream
       setCameraStream(stream)
-
       return true
     } catch {
       alert('카메라 권한이 필요해요.\n브라우저 주소창 왼쪽의 자물쇠 아이콘에서 카메라를 허용해주세요.')
@@ -330,6 +340,7 @@ export default function App() {
 
         if (isFirstFlush) {
           m = pending.match(/^([\s\S]*?[,，、])(.*)$/)
+
           if (m && m[1].trim().length >= 6) {
             enqueueTTS(m[1])
             pending = m[2]
@@ -359,9 +370,7 @@ export default function App() {
           })
         })
 
-        if (!res.ok || !res.body) {
-          throw new Error('chat-stream http ' + res.status)
-        }
+        if (!res.ok || !res.body) throw new Error('chat-stream http ' + res.status)
 
         const reader = res.body.getReader()
         const decoder = new TextDecoder()
@@ -463,10 +472,11 @@ export default function App() {
   const submitSpeechText = useCallback(
     (rawText) => {
       const text = normalizeTranscript(rawText)
+
       if (!text || text.length < 2) return
 
       if (isSpeakingRef.current || isProcessingRef.current) {
-        console.warn('[echo guard] transcript dropped:', text.slice(0, 30))
+        console.warn('[echo guard] transcript dropped (speaking/processing):', text.slice(0, 30))
         return
       }
 
@@ -502,7 +512,6 @@ export default function App() {
     })
 
     micRecorderRef.current = rec
-
     return rec
   }, [submitSpeechText])
 
@@ -573,13 +582,7 @@ export default function App() {
       echoResumeTimerRef.current = setTimeout(() => {
         const r = micRecorderRef.current
 
-        if (
-          r &&
-          r.isRunning &&
-          autoListenRef.current &&
-          !isSpeakingRef.current &&
-          !isProcessingRef.current
-        ) {
+        if (r && r.isRunning && autoListenRef.current && !isSpeakingRef.current && !isProcessingRef.current) {
           r.resume()
         }
       }, ECHO_RESUME_DELAY_MS)
@@ -645,7 +648,6 @@ export default function App() {
     clearTimeout(echoResumeTimerRef.current)
 
     lastSubmittedSpeechRef.current = { key: '', at: 0 }
-
     autoListenRef.current = false
     setAutoListen(false)
 
@@ -671,7 +673,6 @@ export default function App() {
     clearTimeout(echoResumeTimerRef.current)
 
     lastSubmittedSpeechRef.current = { key: '', at: 0 }
-
     autoListenRef.current = false
     setAutoListen(false)
 
@@ -680,14 +681,12 @@ export default function App() {
     stopUserCamera()
 
     isSpeakingRef.current = false
-
     sessionRef.current = null
     sessionIdRef.current = newSessionId()
     historyRef.current = []
 
     setStatus('connected')
     setMessages([{ role: 'assistant', text: GREETING_TEXT }])
-
     saveChat(sessionIdRef.current, 'assistant', GREETING_TEXT)
   }, [stopListening, stopUserCamera])
 
@@ -711,14 +710,12 @@ export default function App() {
 
     setStatus('connected')
     setMessages([{ role: 'assistant', text: GREETING_TEXT }])
-
     saveChat(sessionIdRef.current, 'assistant', GREETING_TEXT)
 
     enqueueTTS(normalizeTtsText(GREETING_TTS))
 
     autoListenRef.current = true
     setAutoListen(true)
-
     startListening()
   }, [startListening, startUserCamera, stopUserCamera, enqueueTTS])
 
@@ -785,61 +782,60 @@ export default function App() {
 
   const isChatConnected = status !== 'idle' && status !== 'connecting'
 
+  const coachModeClass =
+    conversationMode === 'ttt'
+      ? styles.coachTextMode
+      : conversationMode === 'sts'
+        ? styles.coachVoiceMode
+        : styles.coachAvatarMode
+
   return (
-  <div className={styles.mindGuardApp}>
-    <StockGuardPanel onSendToChat={sendMessage} />
+    <div className={`${styles.app} ${styles.mindGuardApp} ${coachModeClass}`}>
+      <StockGuardPanel onSendToChat={sendMessage} />
 
-    <aside
-      className={`${styles.mindGuardCoachPanel} ${
-        conversationMode === 'ttt'
-          ? styles.coachTextMode
-          : conversationMode === 'sts'
-            ? styles.coachVoiceMode
-            : styles.coachAvatarMode
-      }`}
-    >
-      <div className={styles.mindGuardAvatarSlot}>
-        <AvatarPanel
-          status={status}
-          mode={conversationMode}
-          onModeChange={changeConversationMode}
-          vrmAvatarRef={vrmAvatarRef}
-          onAvatarReady={handleAvatarReady}
-          userVideoRef={userVideoRef}
-          videoReady={videoReady}
-          cameraActive={Boolean(cameraStream)}
-          onStart={startConversation}
-          onStop={stopAvatar}
-          onInterrupt={interruptAvatar}
-          isListening={isListening}
-        />
-      </div>
+      <aside className={styles.mindGuardCoachPanel}>
+        <div className={styles.mindGuardAvatarSlot}>
+          <AvatarPanel
+            status={status}
+            mode={conversationMode}
+            onModeChange={changeConversationMode}
+            vrmAvatarRef={vrmAvatarRef}
+            onAvatarReady={handleAvatarReady}
+            userVideoRef={userVideoRef}
+            videoReady={videoReady}
+            cameraActive={Boolean(cameraStream)}
+            onStart={startConversation}
+            onStop={stopAvatar}
+            onInterrupt={interruptAvatar}
+            isListening={isListening}
+          />
+        </div>
 
-      <div className={styles.mindGuardChatSlot}>
-        <ChatPanel
-          messages={messages}
-          isProcessing={isProcessing}
-          onSend={sendMessage}
-          connected={isChatConnected}
-          isListening={isListening}
-          onToggleMic={toggleMic}
-          micEnabled={conversationMode !== 'ttt' && isChatConnected}
-          micAvailable={conversationMode !== 'ttt'}
-          mode={conversationMode}
-          user={user}
-          onLoginClick={() => setAuthOpen(true)}
-          onLogout={handleLogout}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-        />
-      </div>
-    </aside>
+        <div className={styles.mindGuardChatSlot}>
+          <ChatPanel
+            messages={messages}
+            isProcessing={isProcessing}
+            onSend={sendMessage}
+            connected={isChatConnected}
+            isListening={isListening}
+            onToggleMic={toggleMic}
+            micEnabled={conversationMode !== 'ttt' && isChatConnected}
+            micAvailable={conversationMode !== 'ttt'}
+            mode={conversationMode}
+            user={user}
+            onLoginClick={() => setAuthOpen(true)}
+            onLogout={handleLogout}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+          />
+        </div>
+      </aside>
 
-    <AuthModal
-      open={authOpen}
-      onClose={() => setAuthOpen(false)}
-      onSuccess={(u) => setUser(u)}
-    />
-  </div>
-)
+      <AuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        onSuccess={(u) => setUser(u)}
+      />
+    </div>
+  )
 }
