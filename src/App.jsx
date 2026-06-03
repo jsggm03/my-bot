@@ -7,25 +7,7 @@ import styles from './App.module.css'
 import { newSessionId, saveChat, getUser, clearAuth, verifyToken } from './lib/api'
 import { MicRecorder, isMicRecorderSupported } from './lib/stt'
 
-// cha-bot-starter-kit
-// ─────────────────────────────────────────────────────────────
-// VRoid VRM (browser-rendered via three-vrm) + streaming chat +
-// voice (STT/TTS).
-//
-// Three conversation modes:
-// ftf : face-to-face (avatar + camera + voice)
-// sts : speech-to-speech (avatar + voice, no camera)
-// ttt : text-to-text (text-only, no avatar/mic)
-//
-// Backend endpoints (Vercel serverless, see /api):
-// /api/chat-stream SSE LLM stream
-// /api/tts text → audio
-// /api/stt audio → text
-//
-// All three proxy to your on-premise server (configure in .env).
-
 const ECHO_RESUME_DELAY_MS = 700
-
 const GREETING_TEXT = '안녕하세요. 무엇을 도와드릴까요?'
 const GREETING_TTS = '안녕하세요. 무엇을 도와드릴까요?'
 
@@ -67,13 +49,11 @@ export default function App() {
   const userVideoRef = useRef(null)
   const cameraStreamRef = useRef(null)
   const historyRef = useRef([])
-
   const ttsQueueRef = useRef([])
   const ttsRunningRef = useRef(false)
   const ttsAbortRef = useRef(false)
   const sessionIdRef = useRef(null)
   const conversationModeRef = useRef('ftf')
-
   const micRecorderRef = useRef(null)
   const isSpeakingRef = useRef(false)
   const isProcessingRef = useRef(false)
@@ -119,6 +99,10 @@ export default function App() {
   useEffect(() => {
     if (userVideoRef.current) {
       userVideoRef.current.srcObject = cameraStream || null
+
+      if (cameraStream) {
+        userVideoRef.current.play?.().catch(() => {})
+      }
     }
   }, [cameraStream])
 
@@ -152,15 +136,14 @@ export default function App() {
     if (!video.videoWidth || !video.videoHeight) return null
 
     try {
-      const W = 640
-      const H = 480
       const canvas = document.createElement('canvas')
-      canvas.width = W
-      canvas.height = H
-      canvas.getContext('2d').drawImage(video, 0, 0, W, H)
+      canvas.width = 640
+      canvas.height = 480
+      canvas.getContext('2d').drawImage(video, 0, 0, 640, 480)
+
       return canvas.toDataURL('image/jpeg', 0.7)
-    } catch (e) {
-      console.warn('[captureCameraFrame] failed:', e)
+    } catch (error) {
+      console.warn('[captureCameraFrame] failed:', error)
       return null
     }
   }, [])
@@ -181,6 +164,14 @@ export default function App() {
 
       cameraStreamRef.current = stream
       setCameraStream(stream)
+
+      setTimeout(() => {
+        if (userVideoRef.current && cameraStreamRef.current) {
+          userVideoRef.current.srcObject = cameraStreamRef.current
+          userVideoRef.current.play?.().catch(() => {})
+        }
+      }, 0)
+
       return true
     } catch {
       alert('카메라 권한이 필요해요.\n브라우저 주소창 왼쪽의 자물쇠 아이콘에서 카메라를 허용해주세요.')
@@ -192,10 +183,10 @@ export default function App() {
     return () => stopUserCamera()
   }, [stopUserCamera])
 
-  const sanitizeForTTS = (s) => {
-    if (!s) return ''
+  const sanitizeForTTS = (text) => {
+    if (!text) return ''
 
-    return s
+    return String(text)
       .replace(/https?:\/\/[^\s)\]]+/gi, '')
       .replace(/\bwww\.[^\s)\]]+/gi, '')
       .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '')
@@ -218,8 +209,8 @@ export default function App() {
 
         try {
           buf = await bufPromise
-        } catch (e) {
-          console.warn('[tts queue] fetch fail:', e)
+        } catch (error) {
+          console.warn('[tts queue] fetch fail:', error)
           continue
         }
 
@@ -240,31 +231,34 @@ export default function App() {
 
       if (isSpeakingRef.current && ttsQueueRef.current.length === 0) {
         isSpeakingRef.current = false
-        setStatus((s) => (s === 'speaking' ? 'connected' : s))
+        setStatus((prev) => (prev === 'speaking' ? 'connected' : prev))
       }
     }
   }, [])
 
-  const enqueueTTS = useCallback((sentence) => {
-    const s = (sentence || '').trim()
-    if (!s) return
-    if (conversationModeRef.current === 'ttt') return
+  const enqueueTTS = useCallback(
+    (sentence) => {
+      const raw = String(sentence || '').trim()
+      if (!raw) return
+      if (conversationModeRef.current === 'ttt') return
 
-    const clean = sanitizeForTTS(normalizeTtsText(s))
-    if (!clean) return
+      const clean = sanitizeForTTS(normalizeTtsText(raw))
+      if (!clean) return
 
-    const bufPromise = fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: clean })
-    }).then((res) => {
-      if (!res.ok) throw new Error('tts http ' + res.status)
-      return res.arrayBuffer()
-    })
+      const bufPromise = fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: clean })
+      }).then((res) => {
+        if (!res.ok) throw new Error(`tts http ${res.status}`)
+        return res.arrayBuffer()
+      })
 
-    ttsQueueRef.current.push(bufPromise)
-    processTTSQueue()
-  }, [processTTSQueue])
+      ttsQueueRef.current.push(bufPromise)
+      processTTSQueue()
+    },
+    [processTTSQueue]
+  )
 
   const clearTTSQueue = useCallback(() => {
     ttsAbortRef.current = true
@@ -275,195 +269,203 @@ export default function App() {
     } catch {}
 
     isSpeakingRef.current = false
-    setStatus((s) => (s === 'speaking' ? 'connected' : s))
+    setStatus((prev) => (prev === 'speaking' ? 'connected' : prev))
   }, [])
 
-  const sendMessage = useCallback(async (userText) => {
-    const text = userText.trim()
+  const sendMessage = useCallback(
+    async (userText, displayText) => {
+      const text = String(userText || '').trim()
+      const visibleText = String(displayText || userText || '').trim()
 
-    if (!text || isProcessingRef.current) return
+      if (!text || isProcessingRef.current) return
 
-    if (isSpeakingRef.current) {
-      console.warn('[echo guard] sendMessage suppressed during avatar speaking:', text.slice(0, 30))
-      return
-    }
-
-    isProcessingRef.current = true
-    setIsProcessing(true)
-
-    setMessages((prev) => [...prev, { role: 'user', text }])
-    historyRef.current = [...historyRef.current, { role: 'user', content: text }]
-
-    if (sessionIdRef.current) {
-      saveChat(sessionIdRef.current, 'user', text)
-    }
-
-    setMessages((prev) => [...prev, { role: 'assistant', text: '' }])
-
-    let accumulated = ''
-    let pending = ''
-    let isFirstFlush = true
-
-    const flushPendingIfSentence = () => {
-      const minLen = isFirstFlush ? 6 : 12
-      let m = pending.match(/^([\s\S]*?[.!?…。\n])(.*)$/)
-
-      if (m && m[1].trim().length >= minLen) {
-        enqueueTTS(m[1])
-        pending = m[2]
-        isFirstFlush = false
-        return true
+      if (isSpeakingRef.current) {
+        console.warn('[echo guard] sendMessage suppressed during avatar speaking:', text.slice(0, 30))
+        return
       }
 
-      if (isFirstFlush) {
-        m = pending.match(/^([\s\S]*?[,，、])(.*)$/)
+      isProcessingRef.current = true
+      setIsProcessing(true)
 
-        if (m && m[1].trim().length >= 6) {
-          enqueueTTS(m[1])
-          pending = m[2]
+      setMessages((prev) => [...prev, { role: 'user', text: visibleText || text }])
+      historyRef.current = [...historyRef.current, { role: 'user', content: text }]
+
+      if (sessionIdRef.current) {
+        saveChat(sessionIdRef.current, 'user', visibleText || text)
+      }
+
+      setMessages((prev) => [...prev, { role: 'assistant', text: '' }])
+
+      let accumulated = ''
+      let pending = ''
+      let isFirstFlush = true
+
+      const flushPendingIfSentence = () => {
+        const minLen = isFirstFlush ? 6 : 12
+        let match = pending.match(/^([\s\S]*?[.!?…。\n])(.*)$/)
+
+        if (match && match[1].trim().length >= minLen) {
+          enqueueTTS(match[1])
+          pending = match[2]
           isFirstFlush = false
           return true
         }
+
+        if (isFirstFlush) {
+          match = pending.match(/^([\s\S]*?[,，、])(.*)$/)
+
+          if (match && match[1].trim().length >= 6) {
+            enqueueTTS(match[1])
+            pending = match[2]
+            isFirstFlush = false
+            return true
+          }
+        }
+
+        return false
       }
 
-      return false
-    }
+      try {
+        const VISION_INTENT =
+          /보여|보이|보세요|뒤에|뒷.{0,2}배경|배경에|여기.{0,2}어|주변|화면|카메라|캠|영상|모습|어떻게.{0,3}보|뭐가.{0,3}보/
 
-    try {
-      const VISION_INTENT = /보여|보이|보세요|뒤에|뒷.{0,2}배경|배경에|여기.{0,2}어|주변|화면|카메라|캠|영상|모습|어떻게.{0,3}보|뭐가.{0,3}보/
-      const wantsVision = VISION_INTENT.test(text)
-      const frame = wantsVision ? captureCameraFrame() : null
-      const images = frame ? [frame] : []
+        const wantsVision = VISION_INTENT.test(text)
+        const frame = wantsVision ? captureCameraFrame() : null
+        const images = frame ? [frame] : []
 
-      const res = await fetch('/api/chat-stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          history: historyRef.current.slice(-8),
-          images
+        const res = await fetch('/api/chat-stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: text,
+            history: historyRef.current.slice(-8),
+            images
+          })
         })
-      })
 
-      if (!res.ok || !res.body) {
-        throw new Error('chat-stream http ' + res.status)
-      }
-
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buf = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        buf += decoder.decode(value, { stream: true })
-
-        let nlIdx
-
-        while ((nlIdx = buf.indexOf('\n\n')) !== -1) {
-          const event = buf.slice(0, nlIdx).trim()
-          buf = buf.slice(nlIdx + 2)
-
-          if (!event.startsWith('data: ')) continue
-
-          const payload = event.slice(6).trim()
-
-          if (payload === '[DONE]') {
-            buf = ''
-            break
-          }
-
-          let obj
-
-          try {
-            obj = JSON.parse(payload)
-          } catch {
-            continue
-          }
-
-          if (obj.token) {
-            accumulated += obj.token
-            pending += obj.token
-
-            setMessages((prev) => {
-              const next = [...prev]
-              const last = next[next.length - 1]
-
-              if (last && last.role === 'assistant') {
-                next[next.length - 1] = { ...last, text: accumulated }
-              }
-
-              return next
-            })
-
-            while (flushPendingIfSentence()) {}
-          }
-
-          if (obj.done && pending.trim()) {
-            enqueueTTS(pending)
-            pending = ''
-          }
-
-          if (obj.error) {
-            console.warn('[chat-stream] server error:', obj.error)
-          }
+        if (!res.ok || !res.body) {
+          throw new Error(`chat-stream http ${res.status}`)
         }
-      }
 
-      if (pending.trim()) {
-        enqueueTTS(pending)
-        pending = ''
-      }
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
 
-      const finalReply = accumulated || '죄송해요, 답변을 생성하지 못했어요.'
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
 
-      historyRef.current = [...historyRef.current, { role: 'assistant', content: finalReply }]
+          buffer += decoder.decode(value, { stream: true })
 
-      if (sessionIdRef.current) {
-        saveChat(sessionIdRef.current, 'assistant', finalReply)
-      }
-    } catch (e) {
-      console.warn('[chat-stream] error:', e)
+          let index
 
-      setMessages((prev) => {
-        const next = [...prev]
-        const last = next[next.length - 1]
+          while ((index = buffer.indexOf('\n\n')) !== -1) {
+            const event = buffer.slice(0, index).trim()
+            buffer = buffer.slice(index + 2)
 
-        if (last && last.role === 'assistant' && !last.text) {
-          next[next.length - 1] = {
-            role: 'assistant',
-            text: '오류가 발생했어요. 다시 시도해 주세요.'
+            if (!event.startsWith('data: ')) continue
+
+            const payload = event.slice(6).trim()
+
+            if (payload === '[DONE]') {
+              buffer = ''
+              break
+            }
+
+            let obj
+
+            try {
+              obj = JSON.parse(payload)
+            } catch {
+              continue
+            }
+
+            if (obj.token) {
+              accumulated += obj.token
+              pending += obj.token
+
+              setMessages((prev) => {
+                const next = [...prev]
+                const last = next[next.length - 1]
+
+                if (last && last.role === 'assistant') {
+                  next[next.length - 1] = { ...last, text: accumulated }
+                }
+
+                return next
+              })
+
+              while (flushPendingIfSentence()) {}
+            }
+
+            if (obj.done && pending.trim()) {
+              enqueueTTS(pending)
+              pending = ''
+            }
+
+            if (obj.error) {
+              console.warn('[chat-stream] server error:', obj.error)
+            }
           }
         }
 
-        return next
-      })
-    } finally {
-      isProcessingRef.current = false
-      setIsProcessing(false)
-    }
-  }, [captureCameraFrame, enqueueTTS])
+        if (pending.trim()) {
+          enqueueTTS(pending)
+          pending = ''
+        }
 
-  const submitSpeechText = useCallback((rawText) => {
-    const text = normalizeTranscript(rawText)
+        const finalReply = accumulated || '죄송해요, 답변을 생성하지 못했어요.'
+        historyRef.current = [...historyRef.current, { role: 'assistant', content: finalReply }]
 
-    if (!text || text.length < 2) return
+        if (sessionIdRef.current) {
+          saveChat(sessionIdRef.current, 'assistant', finalReply)
+        }
+      } catch (error) {
+        console.warn('[chat-stream] error:', error)
 
-    if (isSpeakingRef.current || isProcessingRef.current) {
-      console.warn('[echo guard] transcript dropped (speaking/processing):', text.slice(0, 30))
-      return
-    }
+        setMessages((prev) => {
+          const next = [...prev]
+          const last = next[next.length - 1]
 
-    const key = text.replace(/\s+/g, '')
-    const now = Date.now()
-    const last = lastSubmittedSpeechRef.current
+          if (last && last.role === 'assistant' && !last.text) {
+            next[next.length - 1] = {
+              role: 'assistant',
+              text: '오류가 발생했어요. 다시 시도해 주세요.'
+            }
+          }
 
-    if (key === last.key && now - last.at < 8000) return
+          return next
+        })
+      } finally {
+        isProcessingRef.current = false
+        setIsProcessing(false)
+      }
+    },
+    [captureCameraFrame, enqueueTTS]
+  )
 
-    lastSubmittedSpeechRef.current = { key, at: now }
-    sendMessage(text)
-  }, [sendMessage])
+  const submitSpeechText = useCallback(
+    (rawText) => {
+      const text = normalizeTranscript(rawText)
+
+      if (!text || text.length < 2) return
+
+      if (isSpeakingRef.current || isProcessingRef.current) {
+        console.warn('[echo guard] transcript dropped:', text.slice(0, 30))
+        return
+      }
+
+      const key = text.replace(/\s+/g, '')
+      const now = Date.now()
+      const last = lastSubmittedSpeechRef.current
+
+      if (key === last.key && now - last.at < 8000) return
+
+      lastSubmittedSpeechRef.current = { key, at: now }
+      sendMessage(text)
+    },
+    [sendMessage]
+  )
 
   const ensureMicRecorder = useCallback(() => {
     if (micRecorderRef.current) return micRecorderRef.current
@@ -473,40 +475,43 @@ export default function App() {
       return null
     }
 
-    const rec = new MicRecorder({
+    const recorder = new MicRecorder({
       sttEndpoint: '/api/stt',
       onTranscript: (text) => submitSpeechText(text),
-      onError: (err) => console.warn('[STT] MicRecorder error:', err),
-      onStateChange: (st) => {
-        const listening = st === 'listening' || st === 'recording'
+      onError: (error) => console.warn('[STT] MicRecorder error:', error),
+      onStateChange: (state) => {
+        const listening = state === 'listening' || state === 'recording'
+
         isListeningRef.current = listening
         setIsListening(listening)
       }
     })
 
-    micRecorderRef.current = rec
-    return rec
+    micRecorderRef.current = recorder
+
+    return recorder
   }, [submitSpeechText])
 
   const startListening = useCallback(async () => {
-    const rec = ensureMicRecorder()
+    const recorder = ensureMicRecorder()
 
-    if (!rec) {
+    if (!recorder) {
       autoListenRef.current = false
       setAutoListen(false)
       return
     }
 
     try {
-      if (!rec.isRunning) {
-        await rec.start()
+      if (!recorder.isRunning) {
+        await recorder.start()
       } else {
-        rec.resume()
+        recorder.resume()
       }
-    } catch (e) {
-      console.warn('[STT] start failed:', e)
+    } catch (error) {
+      console.warn('[STT] start failed:', error)
 
-      const denied = e?.name === 'NotAllowedError' || /denied|permission|allowed/i.test(e?.message || '')
+      const denied =
+        error?.name === 'NotAllowedError' || /denied|permission|allowed/i.test(error?.message || '')
 
       if (denied) {
         alert('마이크 권한이 필요해요.\n브라우저 주소창 왼쪽의 자물쇠 아이콘을 클릭하여 마이크를 허용해주세요.')
@@ -520,11 +525,11 @@ export default function App() {
   }, [ensureMicRecorder])
 
   const stopListening = useCallback(() => {
-    const rec = micRecorderRef.current
+    const recorder = micRecorderRef.current
 
-    if (rec) {
+    if (recorder) {
       try {
-        rec.stop()
+        recorder.stop()
       } catch {}
 
       micRecorderRef.current = null
@@ -537,32 +542,32 @@ export default function App() {
   const interruptAvatar = useCallback(() => {
     try {
       clearTTSQueue()
-    } catch (e) {
-      console.error('interrupt error:', e)
+    } catch (error) {
+      console.error('interrupt error:', error)
     }
   }, [clearTTSQueue])
 
   useEffect(() => {
-    const rec = micRecorderRef.current
+    const recorder = micRecorderRef.current
 
     clearTimeout(echoResumeTimerRef.current)
 
-    if (!rec || !rec.isRunning) return
+    if (!recorder || !recorder.isRunning) return
 
     if (status === 'speaking') {
-      rec.pause()
+      recorder.pause()
     } else if (status === 'connected' && autoListenRef.current) {
       echoResumeTimerRef.current = setTimeout(() => {
-        const r = micRecorderRef.current
+        const currentRecorder = micRecorderRef.current
 
         if (
-          r &&
-          r.isRunning &&
+          currentRecorder &&
+          currentRecorder.isRunning &&
           autoListenRef.current &&
           !isSpeakingRef.current &&
           !isProcessingRef.current
         ) {
-          r.resume()
+          currentRecorder.resume()
         }
       }, ECHO_RESUME_DELAY_MS)
     }
@@ -571,10 +576,10 @@ export default function App() {
   }, [status])
 
   useEffect(() => {
-    const rec = micRecorderRef.current
+    const recorder = micRecorderRef.current
 
-    if (!isProcessing && autoListen && rec && rec.isRunning && !isSpeakingRef.current) {
-      rec.resume()
+    if (!isProcessing && autoListen && recorder && recorder.isRunning && !isSpeakingRef.current) {
+      recorder.resume()
     }
   }, [isProcessing, autoListen])
 
@@ -598,14 +603,14 @@ export default function App() {
   }, [startListening, stopListening])
 
   useEffect(() => {
-    const handleGlobalKeydown = (e) => {
-      if (e.key !== 'Escape' && e.code !== 'Escape') return
+    const handleGlobalKeydown = (event) => {
+      if (event.key !== 'Escape' && event.code !== 'Escape') return
       if (!sessionRef.current) return
 
-      e.preventDefault()
-      e.stopPropagation()
+      event.preventDefault()
+      event.stopPropagation()
 
-      const target = e.target
+      const target = event.target
 
       if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) {
         target.blur()
@@ -627,7 +632,6 @@ export default function App() {
     clearTimeout(echoResumeTimerRef.current)
 
     lastSubmittedSpeechRef.current = { key: '', at: 0 }
-
     autoListenRef.current = false
     setAutoListen(false)
 
@@ -653,7 +657,6 @@ export default function App() {
     clearTimeout(echoResumeTimerRef.current)
 
     lastSubmittedSpeechRef.current = { key: '', at: 0 }
-
     autoListenRef.current = false
     setAutoListen(false)
 
@@ -662,7 +665,6 @@ export default function App() {
     stopUserCamera()
 
     isSpeakingRef.current = false
-
     sessionRef.current = null
     sessionIdRef.current = newSessionId()
     historyRef.current = []
@@ -683,8 +685,8 @@ export default function App() {
       stopUserCamera()
     }
 
-    for (let i = 0; i < 50 && !vrmAvatarRef.current?.isReady?.(); i++) {
-      await new Promise((r) => setTimeout(r, 100))
+    for (let i = 0; i < 50 && !vrmAvatarRef.current?.isReady?.(); i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100))
     }
 
     sessionRef.current = true
@@ -698,7 +700,6 @@ export default function App() {
 
     autoListenRef.current = true
     setAutoListen(true)
-
     startListening()
   }, [startListening, startUserCamera, stopUserCamera, enqueueTTS])
 
@@ -711,39 +712,79 @@ export default function App() {
     startAvatar()
   }, [startAvatar, startTextMode])
 
-  const changeConversationMode = useCallback((nextMode) => {
-    if (nextMode === conversationModeRef.current) return
+  const changeConversationMode = useCallback(
+    (nextMode) => {
+      if (nextMode === conversationModeRef.current) return
 
-    const hasAvatarSession = Boolean(sessionRef.current)
-    const isTextOnlySession = status !== 'idle' && !hasAvatarSession
+      const hasAvatarSession = Boolean(sessionRef.current)
+      const isTextOnlySession = status !== 'idle' && !hasAvatarSession
 
-    if (isTextOnlySession && nextMode !== 'ttt') {
-      alert('텍스트 대화에서 음성/화상으로 바꾸려면 대화를 종료한 뒤 다시 시작해주세요.')
+      if (isTextOnlySession && nextMode !== 'ttt') {
+        alert('텍스트 대화에서 음성/화상으로 바꾸려면 대화를 종료한 뒤 다시 시작해주세요.')
+        return
+      }
+
+      conversationModeRef.current = nextMode
+      setConversationMode(nextMode)
+
+      if (nextMode === 'ftf') {
+        if (hasAvatarSession) startUserCamera()
+      } else {
+        stopUserCamera()
+      }
+
+      if (nextMode === 'ttt') {
+        autoListenRef.current = false
+        setAutoListen(false)
+        stopListening()
+        return
+      }
+
+      if (hasAvatarSession) {
+        autoListenRef.current = true
+        setAutoListen(true)
+        startListening()
+      }
+    },
+    [startListening, startUserCamera, status, stopListening, stopUserCamera]
+  )
+
+  const toggleCamera = useCallback(() => {
+    if (conversationModeRef.current !== 'ftf') {
+      changeConversationMode('ftf')
       return
     }
 
-    conversationModeRef.current = nextMode
-    setConversationMode(nextMode)
-
-    if (nextMode === 'ftf') {
-      if (hasAvatarSession) startUserCamera()
-    } else {
+    if (cameraStreamRef.current) {
       stopUserCamera()
+    } else {
+      startUserCamera()
     }
+  }, [changeConversationMode, startUserCamera, stopUserCamera])
 
-    if (nextMode === 'ttt') {
-      autoListenRef.current = false
-      setAutoListen(false)
-      stopListening()
-      return
-    }
+  const handleStockGuardSend = useCallback(
+    ({ message, displayText }) => {
+      const prompt = String(message || '').trim()
+      const visible = String(displayText || message || '').trim()
 
-    if (hasAvatarSession) {
-      autoListenRef.current = true
-      setAutoListen(true)
-      startListening()
-    }
-  }, [startListening, startUserCamera, status, stopListening, stopUserCamera])
+      if (!prompt) return
+
+      if (status === 'idle') {
+        conversationModeRef.current = 'ttt'
+        setConversationMode('ttt')
+        startTextMode()
+
+        setTimeout(() => {
+          sendMessage(prompt, visible)
+        }, 120)
+
+        return
+      }
+
+      sendMessage(prompt, visible)
+    },
+    [sendMessage, startTextMode, status]
+  )
 
   useEffect(() => {
     return () => {
@@ -760,49 +801,64 @@ export default function App() {
   }, [])
 
   const isChatConnected = status !== 'idle' && status !== 'connecting'
+  const cameraActive = Boolean(cameraStream)
+  const micActive = autoListen || isListening
 
   return (
-    <div className={styles.app}>
-      <AvatarPanel
-        status={status}
-        mode={conversationMode}
-        onModeChange={changeConversationMode}
-        vrmAvatarRef={vrmAvatarRef}
-        onAvatarReady={handleAvatarReady}
-        userVideoRef={userVideoRef}
-        videoReady={videoReady}
-        cameraActive={Boolean(cameraStream)}
-        onStart={startConversation}
-        onStop={stopAvatar}
-        onInterrupt={interruptAvatar}
-        isListening={isListening}
-      />
+    <div className={styles.appShell}>
+      <section className={styles.leftPane}>
+        <StockGuardPanel onSendToChat={handleStockGuardSend} />
+      </section>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
-        <StockGuardPanel onSendToChat={sendMessage} />
+      <section className={styles.rightPane}>
+        <div className={styles.avatarSlot}>
+          <AvatarPanel
+            status={status}
+            mode={conversationMode}
+            onModeChange={changeConversationMode}
+            vrmAvatarRef={vrmAvatarRef}
+            onAvatarReady={handleAvatarReady}
+            userVideoRef={userVideoRef}
+            videoReady={videoReady}
+            cameraActive={cameraActive}
+            micActive={micActive}
+            onCameraToggle={toggleCamera}
+            onMicToggle={toggleMic}
+            isListening={isListening}
+            onStart={startConversation}
+            onStop={stopAvatar}
+            onInterrupt={interruptAvatar}
+          />
+        </div>
 
-        <ChatPanel
-          messages={messages}
-          isProcessing={isProcessing}
-          onSend={sendMessage}
-          connected={isChatConnected}
-          isListening={isListening}
-          onToggleMic={toggleMic}
-          micEnabled={conversationMode !== 'ttt' && isChatConnected}
-          micAvailable={conversationMode !== 'ttt'}
-          mode={conversationMode}
-          user={user}
-          onLoginClick={() => setAuthOpen(true)}
-          onLogout={handleLogout}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-        />
-      </div>
+        <div className={styles.chatSlot}>
+          <ChatPanel
+            messages={messages}
+            isProcessing={isProcessing}
+            onSend={sendMessage}
+            connected={isChatConnected}
+            isListening={isListening}
+            onToggleMic={toggleMic}
+            micEnabled={micActive}
+            micAvailable={conversationMode !== 'ttt'}
+            mode={conversationMode}
+            user={user}
+            onLoginClick={() => setAuthOpen(true)}
+            onLogout={handleLogout}
+            onOpenSurvey={() => alert('설문 기능은 추후 연결 예정입니다.')}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+          />
+        </div>
+      </section>
 
       <AuthModal
         open={authOpen}
         onClose={() => setAuthOpen(false)}
-        onSuccess={(u) => setUser(u)}
+        onSuccess={(u) => {
+          setUser(u)
+          setAuthOpen(false)
+        }}
       />
     </div>
   )
