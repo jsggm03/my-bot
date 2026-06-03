@@ -26,7 +26,6 @@
   overflow: hidden;
 }
 
-/* 오른쪽 숨돌이 코치 영역 */
 .mindGuardCoachPanel {
   min-width: 0;
   height: 100%;
@@ -38,7 +37,6 @@
   overflow: hidden;
 }
 
-/* 상단 AvatarPanel 영역 */
 .mindGuardAvatarSlot {
   min-height: 0;
   border-bottom: 1px solid rgba(120, 83, 45, 0.12);
@@ -46,13 +44,11 @@
   transition: flex-basis 0.2s ease;
 }
 
-/* AvatarPanel 기본 */
 .mindGuardAvatarSlot > * {
   width: 100% !important;
   min-height: 0 !important;
 }
 
-/* 하단 ChatPanel 영역 */
 .mindGuardChatSlot {
   flex: 1 1 auto;
   min-height: 0;
@@ -72,7 +68,6 @@
    모드별 오른쪽 상단 높이
 ───────────────────────────── */
 
-/* 텍스트 모드: 버튼/상태만 보이면 되므로 작게 */
 .coachTextMode .mindGuardAvatarSlot {
   flex: 0 0 126px;
   overflow: hidden;
@@ -82,7 +77,6 @@
   height: 100% !important;
 }
 
-/* 음성 모드: 마이크 화면이 잘 보이도록 중간 높이 */
 .coachVoiceMode .mindGuardAvatarSlot {
   flex: 0 0 300px;
   overflow-y: auto;
@@ -93,7 +87,6 @@
   height: 100% !important;
 }
 
-/* 아바타 모드: 아바타 카드/카메라/버튼이 잘리지 않도록 크게 */
 .coachAvatarMode .mindGuardAvatarSlot {
   flex: 0 0 clamp(440px, 52vh, 560px);
   overflow-y: auto;
@@ -106,7 +99,7 @@
 }
 
 /* ─────────────────────────────
-   반응형
+   데스크톱 중간 화면
 ───────────────────────────── */
 
 @media (max-width: 1500px) {
@@ -137,17 +130,57 @@
   }
 }
 
-/* 태블릿/모바일: 대시보드 아래에 코치 영역 */
+/* ─────────────────────────────
+   작은 노트북 / 좁은 브라우저
+   핵심: 전체 앱 세로 스크롤 허용
+───────────────────────────── */
+
+@media (max-width: 1100px) {
+  .mindGuardApp {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: block;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .mindGuardCoachPanel {
+    height: auto;
+    min-height: 760px;
+    overflow: visible;
+    border-left: 0;
+    border-top: 1px solid rgba(120, 83, 45, 0.14);
+  }
+
+  .mindGuardAvatarSlot {
+    overflow: visible;
+  }
+
+  .mindGuardChatSlot {
+    min-height: 520px;
+    overflow: hidden;
+  }
+}
+
+/* ─────────────────────────────
+   태블릿
+───────────────────────────── */
+
 @media (max-width: 980px) {
   .mindGuardApp {
     height: auto;
     min-height: 100vh;
+    min-height: 100dvh;
     display: block;
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .mindGuardCoachPanel {
+    height: auto;
     min-height: 760px;
+    overflow: visible;
     border-left: 0;
     border-top: 1px solid rgba(120, 83, 45, 0.14);
   }
@@ -165,13 +198,26 @@
   }
 
   .mindGuardChatSlot {
-    min-height: 420px;
+    min-height: 520px;
   }
 }
 
+/* ─────────────────────────────
+   모바일
+───────────────────────────── */
+
 @media (max-width: 640px) {
+  .mindGuardApp {
+    width: 100%;
+    min-height: 100dvh;
+    display: block;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
   .mindGuardCoachPanel {
     min-height: 720px;
+    overflow: visible;
   }
 
   .coachTextMode .mindGuardAvatarSlot {
@@ -187,16 +233,33 @@
   }
 
   .mindGuardChatSlot {
-    min-height: 420px;
+    min-height: 500px;
   }
 }
 
+/* 아주 작은 모바일 */
 @media (max-width: 420px) {
+  .mindGuardApp {
+    min-height: 100dvh;
+  }
+
+  .coachTextMode .mindGuardAvatarSlot {
+    flex-basis: 108px;
+  }
+
+  .coachVoiceMode .mindGuardAvatarSlot {
+    flex-basis: 220px;
+  }
+
   .coachAvatarMode .mindGuardAvatarSlot {
     flex-basis: 360px;
   }
 
   .mindGuardCoachPanel {
     min-height: 700px;
+  }
+
+  .mindGuardChatSlot {
+    min-height: 480px;
   }
 }
