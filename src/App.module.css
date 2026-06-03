@@ -1,25 +1,20 @@
 .app,
-.appShell,
-.mindGuardApp {
+.appShell {
   width: 100%;
+  min-height: 100vh;
   height: 100vh;
   height: 100dvh;
-  min-height: 100vh;
   background: #fffaf3;
   overflow: hidden;
 }
 
-/* 현재/이전 App.jsx 둘 다 대응 */
-.appShell,
-.mindGuardApp {
+.appShell {
   display: grid;
-  grid-template-columns: minmax(720px, 1fr) minmax(460px, 540px);
+  grid-template-columns: minmax(0, 1fr) 520px;
   align-items: stretch;
 }
 
-/* 왼쪽 메인 영역 */
-.leftPane,
-.mindGuardApp > :first-child:not(.mindGuardCoachPanel) {
+.leftPane {
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -28,53 +23,39 @@
   border-right: 1px solid rgba(120, 83, 45, 0.12);
 }
 
-/* 오른쪽 코치 패널 */
-.rightPane,
-.mindGuardCoachPanel {
+.rightPane {
   min-width: 0;
   min-height: 0;
   height: 100%;
   display: grid;
-  grid-template-rows: minmax(360px, 46vh) minmax(0, 1fr);
+  grid-template-rows: 460px minmax(0, 1fr);
   background: #fffaf3;
   overflow: hidden;
-  position: static !important;
-  transform: none !important;
 }
 
-/* 아바타 영역 */
-.avatarSlot,
-.mindGuardAvatarSlot {
+.avatarSlot {
   min-width: 0;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   background: #fffaf3;
   border-bottom: 1px solid rgba(120, 83, 45, 0.12);
 }
 
-.avatarSlot > *,
-.mindGuardAvatarSlot > * {
-  width: 100% !important;
-  min-height: 100% !important;
+.avatarSlot > * {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
-/* 대화 영역 */
-.chatSlot,
-.mindGuardChatSlot {
+.chatSlot {
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   background: #fffdf8;
-  display: flex;
-  flex-direction: column;
+  overflow: hidden;
 }
 
-.chatSlot > *,
-.mindGuardChatSlot > * {
-  min-height: 0;
-}
-
-/* 채팅 UI */
 .chatHeader {
   min-height: 56px;
   padding: 0 16px;
@@ -117,7 +98,6 @@
 }
 
 .chatBody {
-  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   padding: 18px;
@@ -221,53 +201,51 @@
   fill: #ffffff !important;
 }
 
-/* 창이 좁아졌을 때만 세로 배치 */
+/* 창이 900px 이하로 좁아지면 세로 배치 + 전체 휠 스크롤 */
 @media (max-width: 900px) {
   .app,
-  .appShell,
-  .mindGuardApp {
-    height: auto !important;
-    min-height: 100vh !important;
-    min-height: 100dvh !important;
-    display: block !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
+  .appShell {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
-  .leftPane,
-  .mindGuardApp > :first-child:not(.mindGuardCoachPanel) {
-    height: auto !important;
-    min-height: auto !important;
-    overflow: visible !important;
+  .appShell {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .leftPane {
+    height: auto;
+    min-height: auto;
+    overflow: visible;
     border-right: 0;
     border-bottom: 1px solid rgba(120, 83, 45, 0.12);
   }
 
-  .rightPane,
-  .mindGuardCoachPanel {
-    height: auto !important;
-    min-height: 720px !important;
-    display: block !important;
-    overflow: visible !important;
+  .rightPane {
+    height: auto;
+    min-height: 760px;
+    display: grid;
+    grid-template-rows: auto minmax(520px, 1fr);
+    overflow: visible;
   }
 
-  .avatarSlot,
-  .mindGuardAvatarSlot {
-    min-height: 500px !important;
-    overflow: visible !important;
+  .avatarSlot {
+    min-height: 500px;
+    overflow: visible;
   }
 
-  .chatSlot,
-  .mindGuardChatSlot {
-    min-height: 560px !important;
-    overflow: visible !important;
+  .chatSlot {
+    min-height: 520px;
   }
 }
 
 @media (max-width: 640px) {
-  .avatarSlot,
-  .mindGuardAvatarSlot {
-    min-height: 480px !important;
+  .avatarSlot {
+    min-height: 480px;
   }
 
   .chatHeader {
