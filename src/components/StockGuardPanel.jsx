@@ -55,11 +55,9 @@ export default function StockGuardPanel({ onSendToChat }) {
   const formatAmountShort = (value) => {
     const n = Number(value)
     if (!Number.isFinite(n)) return '-'
-
     if (n >= 1000000000000) return `${(n / 1000000000000).toFixed(1)}조`
     if (n >= 100000000) return `${(n / 100000000).toFixed(1)}억`
     if (n >= 10000) return `${(n / 10000).toFixed(1)}만`
-
     return n.toLocaleString()
   }
 
@@ -129,13 +127,8 @@ export default function StockGuardPanel({ onSendToChat }) {
       return `${buyActors.join('·')} 순매수, ${sellActors.join('·')} 순매도`
     }
 
-    if (buyActors.length > 0) {
-      return `${buyActors.join('·')} 순매수 우위`
-    }
-
-    if (sellActors.length > 0) {
-      return `${sellActors.join('·')} 순매도 우위`
-    }
+    if (buyActors.length > 0) return `${buyActors.join('·')} 순매수 우위`
+    if (sellActors.length > 0) return `${sellActors.join('·')} 순매도 우위`
 
     return '수급 중립'
   }
@@ -179,6 +172,184 @@ export default function StockGuardPanel({ onSendToChat }) {
     }
 
     return `최신일은 '${latestText}', 최근 20일은 '${recent20Text}'입니다.`
+  }
+
+  const getPricePositionText = (summary) => {
+    if (!summary) return '가격 위치 데이터 확인 필요'
+
+    if (summary.drawdownFromHigh <= -25 && summary.reboundFromLow <= 10) {
+      return '고점 대비 크게 내려왔고 저점 반등도 아직 약한 구간입니다.'
+    }
+
+    if (summary.drawdownFromHigh <= -20 && summary.reboundFromLow > 10) {
+      return '고점 대비 하락폭은 크지만 저점에서는 일부 반등한 구간입니다.'
+    }
+
+    if (summary.drawdownFromHigh > -5) {
+      return '90일 고점에 가까워 고점권 진입인지 확인이 필요합니다.'
+    }
+
+    if (summary.reboundFromLow >= 30) {
+      return '저점 대비 이미 많이 반등해 늦은 진입인지 확인해야 합니다.'
+    }
+
+    return '고점과 저점 사이의 중간 구간으로, 방향성을 추가 확인해야 합니다.'
+  }
+
+  const getVolumeText = (volumeRatio) => {
+    if (!Number.isFinite(volumeRatio)) return '거래량 비교 데이터가 부족합니다.'
+    if (volumeRatio >= 2) return '거래량이 평소보다 크게 늘어 관심이나 이슈가 몰린 구간일 수 있습니다.'
+    if (volumeRatio >= 1.3) return '거래량이 평소보다 다소 늘어 가격 움직임의 배경 확인이 필요합니다.'
+    if (volumeRatio <= 0.7) return '거래량이 평소보다 적어 가격 움직임의 신뢰도를 조심해서 봐야 합니다.'
+    return '거래량은 평소 수준과 크게 다르지 않아 가격 흐름만 단정하기 어렵습니다.'
+  }
+
+  const getShortTrendText = (summary) => {
+    if (!summary) return '단기 흐름 데이터 확인 필요'
+
+    if (summary.change5d > 0 && summary.change20d < 0) {
+      return '최근 20일은 약했지만 최근 5일은 반등하는 구간입니다.'
+    }
+
+    if (summary.change5d < 0 && summary.change20d > 0) {
+      return '중기 흐름은 남아 있지만 단기적으로는 조정이 나온 구간입니다.'
+    }
+
+    if (summary.change5d > 8 && summary.change20d > 15) {
+      return '단기와 중기 모두 강하게 오른 구간이라 추격매수 여부를 조심해야 합니다.'
+    }
+
+    if (summary.change5d < -8 && summary.change20d < -15) {
+      return '단기와 중기 모두 약한 구간이라 패닉셀인지 기준 손절인지 구분해야 합니다.'
+    }
+
+    return '단기와 중기 흐름이 극단적이지 않아 추가 지표를 함께 확인해야 합니다.'
+  }
+
+  const getNewsPriorityItems = (summary, marketDiagnostics) => {
+    const items = []
+
+    if (!summary) return ['종목 데이터를 먼저 불러온 뒤 확인합니다.']
+
+    if (Math.abs(summary.change5d) >= 8 || Math.abs(summary.change20d) >= 15) {
+      items.push('최근 가격 변동이 큰 이유가 공시·실적·업종 이슈인지 확인')
+    }
+
+    if (marketDiagnostics.volumeRatio >= 1.5) {
+      items.push('거래량 증가를 동반한 변동이므로 최근 뉴스와 공시를 우선 확인')
+    }
+
+    if (summary.drawdownFromHigh <= -20) {
+      items.push('고점 대비 하락폭이 크므로 실적 둔화, 규제, 업황 악화 여부 확인')
+    }
+
+    if (summary.drawdownFromHigh > -5 || summary.reboundFromLow >= 30) {
+      items.push('고점권 또는 큰 반등 구간이므로 호재가 이미 가격에 반영됐는지 확인')
+    }
+
+    if (marketDiagnostics.flowSignal && marketDiagnostics.flowSignal !== '수급 데이터 확인 필요') {
+      items.push('수급 변화가 일시적인지, 여러 거래일 지속되는 흐름인지 확인')
+    }
+
+    if (items.length === 0) {
+      items.push('가격 변동이 크지 않더라도 최근 실적, 업종 흐름, 공시 여부를 기본 확인')
+    }
+
+    return items
+  }
+
+  const getHistoryType = (summary) => {
+    if (!summary) {
+      return {
+        type: '데이터 확인 필요',
+        desc: '가격 데이터를 불러온 뒤 현재 구간 유형을 분류할 수 있습니다.',
+        checks: ['종목 데이터를 먼저 조회하세요.']
+      }
+    }
+
+    if (summary.drawdownFromHigh <= -20 && summary.change5d > 0 && summary.change20d < 0) {
+      return {
+        type: '고점 대비 큰 하락 후 단기 반등',
+        desc: '최근에는 반등했지만 중기 흐름은 아직 약한 구간입니다.',
+        checks: [
+          '단기 반등이 추세 전환인지 아직 단정하지 않기',
+          '거래량과 수급 개선이 이어지는지 확인',
+          '추가 하락 가능성도 함께 고려'
+        ]
+      }
+    }
+
+    if (summary.drawdownFromHigh <= -20 && summary.change5d <= 0) {
+      return {
+        type: '고점 대비 큰 하락 지속',
+        desc: '낙폭이 큰 상태에서 아직 뚜렷한 반등 신호가 약한 구간입니다.',
+        checks: [
+          '공포 매도인지 기준 손절인지 구분',
+          '하락 원인이 일시적인지 구조적인지 확인',
+          '평단 낮추기 목적의 추가매수는 특히 주의'
+        ]
+      }
+    }
+
+    if (summary.drawdownFromHigh > -5 && summary.change20d > 10) {
+      return {
+        type: '고점 근처 강세 구간',
+        desc: '최근 흐름이 강하지만 이미 기대가 가격에 반영됐을 수 있는 구간입니다.',
+        checks: [
+          '놓칠까 봐 들어가는 추격매수인지 확인',
+          '목표 수익률과 손절 기준을 먼저 정리',
+          '호재가 이미 반영됐는지 확인'
+        ]
+      }
+    }
+
+    if (summary.reboundFromLow >= 30) {
+      return {
+        type: '저점 대비 큰 반등 구간',
+        desc: '저점에서는 크게 올라온 상태라 진입 가격을 더 엄격히 봐야 합니다.',
+        checks: [
+          '저점 기준 수익률에만 끌리지 않기',
+          '현재가가 고점권에 가까운지 확인',
+          '거래량과 수급이 이어지는지 확인'
+        ]
+      }
+    }
+
+    return {
+      type: '중립·확인 구간',
+      desc: '극단적인 과열이나 급락보다는 여러 지표를 함께 확인해야 하는 구간입니다.',
+      checks: [
+        '가격 흐름만으로 단정하지 않기',
+        '수급과 거래량을 함께 확인',
+        '내 매매 기준과 현재 행동이 일치하는지 점검'
+      ]
+    }
+  }
+
+  const getMetricComment = (key, value, summary, marketDiagnostics) => {
+    if (!summary) return ''
+
+    if (key === 'currentPrice') return '현재 판단의 기준 가격입니다.'
+    if (key === 'previousDayRate') return '하루 움직임만으로 원인을 단정하지 않는 것이 좋습니다.'
+    if (key === 'previousDayDiff') return '전일 대비 변화폭입니다. 단기 감정 반응을 유발할 수 있습니다.'
+    if (key === 'high90d') return '최근 고점 기준입니다. 고점 대비 위치를 함께 봐야 합니다.'
+    if (key === 'low90d') return '최근 저점 기준입니다. 저점 대비 반등 정도를 확인합니다.'
+    if (key === 'drawdown') {
+      if (summary.drawdownFromHigh <= -20) return '고점 대비 하락폭이 커 손실 회피 감정이 강해질 수 있습니다.'
+      if (summary.drawdownFromHigh > -5) return '고점과 가까워 추격매수 여부를 조심해야 합니다.'
+      return '고점 대비 어느 정도 떨어져 있는지 보는 지표입니다.'
+    }
+    if (key === 'rebound') {
+      if (summary.reboundFromLow >= 30) return '저점 대비 이미 많이 반등해 늦은 진입 여부를 확인해야 합니다.'
+      return '저점에서 얼마나 회복했는지 보는 지표입니다.'
+    }
+    if (key === 'volume') return '거래량은 관심이 몰렸는지 확인하는 보조 지표입니다.'
+    if (key === 'amount') return '거래대금은 시장 관심도를 보는 보조 지표입니다.'
+    if (key === 'volumeRatio') return getVolumeText(marketDiagnostics.volumeRatio)
+    if (key === 'individual') return '개인 수급은 감정적 쏠림 여부를 볼 때 참고합니다.'
+    if (key === 'foreign') return '외국인 수급은 중장기 수급 방향을 볼 때 참고합니다.'
+    if (key === 'institution') return '기관 수급은 단기·중기 수급 확인에 참고합니다.'
+    return ''
   }
 
   const marketDiagnostics = useMemo(() => {
@@ -239,50 +410,19 @@ export default function StockGuardPanel({ onSendToChat }) {
     const flags = []
     const reasonSummary = []
 
-    if (summary.change5d >= 10) {
-      flags.push('최근 5거래일 급등')
-      reasonSummary.push('단기 가격 상승폭이 커서 추격매수 여부를 점검해야 합니다.')
-    }
+    reasonSummary.push(getPricePositionText(summary))
+    reasonSummary.push(getShortTrendText(summary))
+    reasonSummary.push(getVolumeText(volumeRatio))
 
-    if (summary.change5d <= -8) {
-      flags.push('최근 5거래일 급락')
-      reasonSummary.push('단기 하락폭이 커서 공포 매도인지 기준 손절인지 구분해야 합니다.')
-    }
-
-    if (summary.change20d >= 20) {
-      flags.push('최근 20거래일 강한 상승')
-      reasonSummary.push('중기 흐름이 강하게 오른 상태라 이미 가격에 기대가 반영되었을 수 있습니다.')
-    }
-
-    if (summary.change20d <= -15) {
-      flags.push('최근 20거래일 약세')
-      reasonSummary.push('중기 흐름이 약한 상태라 단순 반등만 보고 판단하기 어렵습니다.')
-    }
-
-    if (summary.drawdownFromHigh > -5) {
-      flags.push('90일 고점 근처')
-      reasonSummary.push('90일 고점과 가까워 고점권 매수인지 확인이 필요합니다.')
-    }
-
-    if (summary.drawdownFromHigh <= -20) {
-      flags.push('고점 대비 큰 하락')
-      reasonSummary.push('고점 대비 하락폭이 커서 손실 회피 감정이 강해질 수 있습니다.')
-    }
-
-    if (summary.reboundFromLow >= 30) {
-      flags.push('저점 대비 큰 반등')
-      reasonSummary.push('저점 대비 이미 많이 반등했다면 늦은 진입인지 확인해야 합니다.')
-    }
-
-    if (volumeRatio !== null && volumeRatio >= 1.8) {
-      flags.push('거래량 증가')
-      reasonSummary.push('거래량이 평소보다 늘어 관심이 몰린 구간일 수 있습니다.')
-    }
-
-    if (volumeRatio !== null && volumeRatio < 0.7) {
-      flags.push('거래량 둔화')
-      reasonSummary.push('거래량이 약하면 가격 움직임의 신뢰도를 더 조심해서 봐야 합니다.')
-    }
+    if (summary.change5d >= 10) flags.push('최근 5거래일 급등')
+    if (summary.change5d <= -8) flags.push('최근 5거래일 급락')
+    if (summary.change20d >= 20) flags.push('최근 20거래일 강한 상승')
+    if (summary.change20d <= -15) flags.push('최근 20거래일 약세')
+    if (summary.drawdownFromHigh > -5) flags.push('90일 고점 근처')
+    if (summary.drawdownFromHigh <= -20) flags.push('고점 대비 큰 하락')
+    if (summary.reboundFromLow >= 30) flags.push('저점 대비 큰 반등')
+    if (volumeRatio !== null && volumeRatio >= 1.8) flags.push('거래량 증가')
+    if (volumeRatio !== null && volumeRatio < 0.7) flags.push('거래량 둔화')
 
     if (flowSignal && flowSignal !== '수급 데이터 확인 필요') {
       flags.push(flowSignal)
@@ -291,6 +431,10 @@ export default function StockGuardPanel({ onSendToChat }) {
 
     if (flowRecent20Signal && flowRecent20Signal !== '수급 데이터 확인 필요') {
       reasonSummary.push(`최근 20일 수급은 '${flowRecent20Signal}'입니다.`)
+    }
+
+    if (flowConsistency && flowConsistency !== '수급 데이터 확인 필요') {
+      reasonSummary.push(flowConsistency)
     }
 
     const avgPrice = Number(form.averagePrice)
@@ -1386,6 +1530,12 @@ ${buildAnalysisSummary()}
                 formatAmountShort={formatAmountShort}
                 buildFlowInterpretation={buildFlowInterpretation}
                 buildFlowConsistency={buildFlowConsistency}
+                getPricePositionText={getPricePositionText}
+                getShortTrendText={getShortTrendText}
+                getVolumeText={getVolumeText}
+                getNewsPriorityItems={getNewsPriorityItems}
+                getHistoryType={getHistoryType}
+                getMetricComment={getMetricComment}
               />
             </section>
           )}
@@ -1457,7 +1607,13 @@ function DetailPanel({
   formatSignedNumber,
   formatAmountShort,
   buildFlowInterpretation,
-  buildFlowConsistency
+  buildFlowConsistency,
+  getPricePositionText,
+  getShortTrendText,
+  getVolumeText,
+  getNewsPriorityItems,
+  getHistoryType,
+  getMetricComment
 }) {
   const summary = stockData.summary
   const current = stockData.current || {}
@@ -1483,19 +1639,15 @@ function DetailPanel({
         <div className="miniGrid">
           <MiniInsightCard
             title="가격 위치"
-            text={`90일 고점 대비 ${summary.drawdownFromHigh}%, 90일 저점 대비 ${summary.reboundFromLow}% 위치입니다.`}
+            text={getPricePositionText(summary)}
           />
           <MiniInsightCard
-            title="단기 흐름"
-            text={`최근 5거래일 ${summary.change5d}%, 최근 20거래일 ${summary.change20d}% 흐름입니다.`}
+            title="단기·중기 흐름"
+            text={getShortTrendText(summary)}
           />
           <MiniInsightCard
             title="거래량 신호"
-            text={
-              marketDiagnostics.volumeRatio
-                ? `최근 거래량은 20거래일 평균 대비 약 ${marketDiagnostics.volumeRatio.toFixed(2)}배입니다.`
-                : '거래량 평균 대비 배율은 아직 계산되지 않았습니다.'
-            }
+            text={getVolumeText(marketDiagnostics.volumeRatio)}
           />
           <MiniInsightCard
             title="수급 신호"
@@ -1504,18 +1656,15 @@ function DetailPanel({
         </div>
 
         <ul className="detailList" style={{ marginTop: '12px' }}>
-          {marketDiagnostics.reasonSummary.length > 0 ? (
-            marketDiagnostics.reasonSummary.map((text) => <li key={text}>{text}</li>)
-          ) : (
-            <li>현재 데이터만으로는 뚜렷한 급등·급락 원인 후보가 강하게 잡히지 않습니다.</li>
-          )}
+          {marketDiagnostics.reasonSummary.map((text) => (
+            <li key={text}>{text}</li>
+          ))}
           <li>
             감지된 신호:{' '}
             {marketDiagnostics.flags.length > 0
               ? marketDiagnostics.flags.join(', ')
               : '뚜렷한 급등·급락 신호 없음'}
           </li>
-          {marketDiagnostics.flowConsistency && <li>{marketDiagnostics.flowConsistency}</li>}
         </ul>
 
         <p style={safeNoticeStyle}>
@@ -1560,64 +1709,31 @@ function DetailPanel({
         </p>
 
         <div className="miniGrid">
-          <MiniInsightCard
-            title="개인 순매수"
-            text={formatSignedNumber(latest.individual?.netQty, '주')}
-          />
-          <MiniInsightCard
-            title="외국인 순매수"
-            text={formatSignedNumber(latest.foreign?.netQty, '주')}
-          />
-          <MiniInsightCard
-            title="기관 순매수"
-            text={formatSignedNumber(latest.institution?.netQty, '주')}
-          />
+          <MiniInsightCard title="개인 순매수" text={formatSignedNumber(latest.individual?.netQty, '주')} />
+          <MiniInsightCard title="외국인 순매수" text={formatSignedNumber(latest.foreign?.netQty, '주')} />
+          <MiniInsightCard title="기관 순매수" text={formatSignedNumber(latest.institution?.netQty, '주')} />
           <MiniInsightCard title="최신일 해석" text={latestText} />
         </div>
 
         <div className="miniGrid">
-          <MiniInsightCard
-            title="최근 5일 개인"
-            text={formatSignedNumber(getActor(flowSummary.recent5, 'individual'), '주')}
-          />
-          <MiniInsightCard
-            title="최근 5일 외국인"
-            text={formatSignedNumber(getActor(flowSummary.recent5, 'foreign'), '주')}
-          />
-          <MiniInsightCard
-            title="최근 5일 기관"
-            text={formatSignedNumber(getActor(flowSummary.recent5, 'institution'), '주')}
-          />
+          <MiniInsightCard title="최근 5일 개인" text={formatSignedNumber(getActor(flowSummary.recent5, 'individual'), '주')} />
+          <MiniInsightCard title="최근 5일 외국인" text={formatSignedNumber(getActor(flowSummary.recent5, 'foreign'), '주')} />
+          <MiniInsightCard title="최근 5일 기관" text={formatSignedNumber(getActor(flowSummary.recent5, 'institution'), '주')} />
           <MiniInsightCard title="최근 5일 해석" text={recent5Text} />
         </div>
 
         <div className="miniGrid">
-          <MiniInsightCard
-            title="최근 20일 개인"
-            text={formatSignedNumber(getActor(flowSummary.recent20, 'individual'), '주')}
-          />
-          <MiniInsightCard
-            title="최근 20일 외국인"
-            text={formatSignedNumber(getActor(flowSummary.recent20, 'foreign'), '주')}
-          />
-          <MiniInsightCard
-            title="최근 20일 기관"
-            text={formatSignedNumber(getActor(flowSummary.recent20, 'institution'), '주')}
-          />
+          <MiniInsightCard title="최근 20일 개인" text={formatSignedNumber(getActor(flowSummary.recent20, 'individual'), '주')} />
+          <MiniInsightCard title="최근 20일 외국인" text={formatSignedNumber(getActor(flowSummary.recent20, 'foreign'), '주')} />
+          <MiniInsightCard title="최근 20일 기관" text={formatSignedNumber(getActor(flowSummary.recent20, 'institution'), '주')} />
           <MiniInsightCard title="최근 20일 해석" text={recent20Text} />
         </div>
 
         <ul className="detailList" style={{ marginTop: '12px' }}>
           <li>{consistencyText}</li>
-          <li>
-            개인 순매수가 강하고 외국인·기관이 함께 순매도하면 개인 매수 쏠림 가능성을 확인합니다.
-          </li>
-          <li>
-            외국인·기관이 함께 순매수하면 수급은 우호적으로 볼 수 있지만, 가격이 이미 고점권인지도 함께 확인해야 합니다.
-          </li>
-          <li>
-            수급이 혼조일 때는 가격 흐름만 보고 단정하기보다 공시·뉴스와 거래량을 함께 확인해야 합니다.
-          </li>
+          <li>개인 순매수가 강하고 외국인·기관이 함께 순매도하면 개인 매수 쏠림 가능성을 확인합니다.</li>
+          <li>외국인·기관이 함께 순매수하면 수급은 우호적으로 볼 수 있지만, 가격이 이미 고점권인지도 함께 확인해야 합니다.</li>
+          <li>수급이 혼조일 때는 가격 흐름만 보고 단정하기보다 공시·뉴스와 거래량을 함께 확인해야 합니다.</li>
         </ul>
 
         <p style={safeNoticeStyle}>
@@ -1628,43 +1744,70 @@ function DetailPanel({
   }
 
   if (activeDetail === 'news') {
+    const priorityItems = getNewsPriorityItems(summary, marketDiagnostics)
+
     return (
       <div className="detailPanel">
-        <p className="detailPanelTitle">공시·뉴스 — 다음 고도화 예정</p>
+        <p className="detailPanelTitle">공시·뉴스 — 확인 우선순위</p>
+
         <div className="miniGrid">
-          <MiniInsightCard title="실적" text="실적 발표 또는 실적 전망 변화 여부를 확인할 예정입니다." />
-          <MiniInsightCard title="공시" text="계약, 증자, 전환사채, 최대주주 변경 등을 확인할 예정입니다." />
-          <MiniInsightCard title="주의 이벤트" text="소송, 제재, 투자경고, 관리종목 관련 이슈를 확인할 예정입니다." />
+          <MiniInsightCard
+            title="가격 변동"
+            text={`최근 5거래일 ${summary.change5d}%, 최근 20거래일 ${summary.change20d}% 흐름입니다.`}
+          />
+          <MiniInsightCard
+            title="거래량"
+            text={
+              marketDiagnostics.volumeRatio
+                ? `20거래일 평균 대비 약 ${marketDiagnostics.volumeRatio.toFixed(2)}배입니다.`
+                : '거래량 비교 데이터가 부족합니다.'
+            }
+          />
+          <MiniInsightCard
+            title="수급"
+            text={marketDiagnostics.flowSignal || '수급 데이터 확인 대기 중입니다.'}
+          />
         </div>
+
         <ul className="detailList" style={{ marginTop: '12px' }}>
-          <li>가격 변동과 함께 확인할 이벤트 후보를 표시합니다.</li>
-          <li>뉴스 제목만 보고 원인을 단정하지 않도록 요약·분류 형태로 제공하는 것이 목표입니다.</li>
-          <li>“이 뉴스 때문에 올랐다”가 아니라 “함께 확인할 이벤트”로 표현합니다.</li>
+          {priorityItems.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+          <li>뉴스 제목만 보고 원인을 단정하지 말고, 가격·거래량·수급 변화와 함께 확인합니다.</li>
         </ul>
+
         <p style={safeNoticeStyle}>
-          공시·뉴스는 추후 API로 연결하고, 현재는 가격 변동의 원인을 단정하지 않습니다.
+          현재는 실제 뉴스 API가 아니라, 보유한 가격·거래량·수급 데이터로 “무엇을 먼저 확인할지” 안내하는 단계입니다.
         </p>
       </div>
     )
   }
 
   if (activeDetail === 'history') {
+    const historyType = getHistoryType(summary)
+
     return (
       <div className="detailPanel">
-        <p className="detailPanelTitle">과거 유사 구간 — 다음 고도화 예정</p>
+        <p className="detailPanelTitle">과거 유사 구간 — 현재 구간 유형 분류</p>
+
         <div className="miniGrid">
-          <MiniInsightCard title="반등 사례" text="유사 낙폭 이후 반등한 구간을 따로 표시할 예정입니다." />
-          <MiniInsightCard title="횡보 사례" text="유사 구간 이후 방향 없이 머문 사례도 함께 표시할 예정입니다." />
-          <MiniInsightCard title="추가 하락 사례" text="유사 구간 이후 더 하락한 사례를 반드시 함께 표시할 예정입니다." />
+          <MiniInsightCard title="현재 구간 유형" text={historyType.type} />
+          <MiniInsightCard title="해석" text={historyType.desc} />
+          <MiniInsightCard
+            title="가격 위치"
+            text={`90일 고점 대비 ${summary.drawdownFromHigh}%, 저점 대비 ${summary.reboundFromLow}%입니다.`}
+          />
         </div>
+
         <ul className="detailList" style={{ marginTop: '12px' }}>
-          <li>90일 고점 대비 -20% 이상 하락했던 과거 구간</li>
-          <li>이후 20거래일·60거래일 흐름</li>
-          <li>회복까지 걸린 기간</li>
-          <li>추가 하락 최대폭</li>
+          {historyType.checks.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+          <li>이 구간 분류는 예측이 아니라, 현재 행동을 점검하기 위한 참고 프레임입니다.</li>
         </ul>
+
         <p style={safeNoticeStyle}>
-          반등 확률처럼 보이게 만들지 않고, 예측이 아닌 과거 참고 분포로만 제공하는 방향이 안전합니다.
+          반등 확률처럼 보이게 만들지 않고, 예측이 아닌 현재 구간의 성격 분류로만 제공합니다.
         </p>
       </div>
     )
@@ -1673,36 +1816,25 @@ function DetailPanel({
   return (
     <div className="detailPanel">
       <p className="detailPanelTitle">상세 지표</p>
+
       <div className="miniGrid">
-        <MiniInsightCard title="현재가" text={formatWon(summary.currentPrice)} />
-        <MiniInsightCard title="전일 등락률" text={`${current.previousDayRate ?? '-'}%`} />
-        <MiniInsightCard title="전일 대비" text={formatWon(current.previousDayDiff)} />
-        <MiniInsightCard title="90일 고점" text={formatWon(summary.high90d)} />
-        <MiniInsightCard title="90일 저점" text={formatWon(summary.low90d)} />
-        <MiniInsightCard title="고점 대비" text={`${summary.drawdownFromHigh}%`} />
-        <MiniInsightCard title="저점 대비" text={`${summary.reboundFromLow}%`} />
-        <MiniInsightCard title="누적 거래량" text={formatNumber(current.accumulatedVolume)} />
-        <MiniInsightCard title="누적 거래대금" text={formatAmountShort(current.accumulatedAmount)} />
-        <MiniInsightCard
+        <MetricInsightCard title="현재가" value={formatWon(summary.currentPrice)} comment={getMetricComment('currentPrice', summary.currentPrice, summary, marketDiagnostics)} />
+        <MetricInsightCard title="전일 등락률" value={`${current.previousDayRate ?? '-'}%`} comment={getMetricComment('previousDayRate', current.previousDayRate, summary, marketDiagnostics)} />
+        <MetricInsightCard title="전일 대비" value={formatWon(current.previousDayDiff)} comment={getMetricComment('previousDayDiff', current.previousDayDiff, summary, marketDiagnostics)} />
+        <MetricInsightCard title="90일 고점" value={formatWon(summary.high90d)} comment={getMetricComment('high90d', summary.high90d, summary, marketDiagnostics)} />
+        <MetricInsightCard title="90일 저점" value={formatWon(summary.low90d)} comment={getMetricComment('low90d', summary.low90d, summary, marketDiagnostics)} />
+        <MetricInsightCard title="고점 대비" value={`${summary.drawdownFromHigh}%`} comment={getMetricComment('drawdown', summary.drawdownFromHigh, summary, marketDiagnostics)} />
+        <MetricInsightCard title="저점 대비" value={`${summary.reboundFromLow}%`} comment={getMetricComment('rebound', summary.reboundFromLow, summary, marketDiagnostics)} />
+        <MetricInsightCard title="누적 거래량" value={formatNumber(current.accumulatedVolume)} comment={getMetricComment('volume', current.accumulatedVolume, summary, marketDiagnostics)} />
+        <MetricInsightCard title="누적 거래대금" value={formatAmountShort(current.accumulatedAmount)} comment={getMetricComment('amount', current.accumulatedAmount, summary, marketDiagnostics)} />
+        <MetricInsightCard
           title="20일 평균 대비 거래량"
-          text={
-            marketDiagnostics.volumeRatio
-              ? `${marketDiagnostics.volumeRatio.toFixed(2)}배`
-              : '-'
-          }
+          value={marketDiagnostics.volumeRatio ? `${marketDiagnostics.volumeRatio.toFixed(2)}배` : '-'}
+          comment={getMetricComment('volumeRatio', marketDiagnostics.volumeRatio, summary, marketDiagnostics)}
         />
-        <MiniInsightCard
-          title="개인 순매수"
-          text={formatSignedNumber(flowSummary?.individual?.netQty, '주')}
-        />
-        <MiniInsightCard
-          title="외국인 순매수"
-          text={formatSignedNumber(flowSummary?.foreign?.netQty, '주')}
-        />
-        <MiniInsightCard
-          title="기관 순매수"
-          text={formatSignedNumber(flowSummary?.institution?.netQty, '주')}
-        />
+        <MetricInsightCard title="개인 순매수" value={formatSignedNumber(flowSummary?.individual?.netQty, '주')} comment={getMetricComment('individual', flowSummary?.individual?.netQty, summary, marketDiagnostics)} />
+        <MetricInsightCard title="외국인 순매수" value={formatSignedNumber(flowSummary?.foreign?.netQty, '주')} comment={getMetricComment('foreign', flowSummary?.foreign?.netQty, summary, marketDiagnostics)} />
+        <MetricInsightCard title="기관 순매수" value={formatSignedNumber(flowSummary?.institution?.netQty, '주')} comment={getMetricComment('institution', flowSummary?.institution?.netQty, summary, marketDiagnostics)} />
       </div>
     </div>
   )
@@ -1719,9 +1851,22 @@ function MiniInsightCard({ title, text }) {
   )
 }
 
+function MetricInsightCard({ title, value, comment }) {
+  return (
+    <div style={miniInsightCardStyle}>
+      <strong style={{ display: 'block', fontSize: '12px', color: '#64748b' }}>{title}</strong>
+      <p style={{ margin: '6px 0 0', fontSize: '16px', color: '#0f172a', fontWeight: 850 }}>
+        {value}
+      </p>
+      <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#64748b', lineHeight: 1.45 }}>
+        {comment}
+      </p>
+    </div>
+  )
+}
+
 function MiniPriceChart({ prices, stock }) {
   const chartPrices = prices.slice(-60)
-
   if (!chartPrices.length) return null
 
   const width = 720
@@ -1734,13 +1879,8 @@ function MiniPriceChart({ prices, stock }) {
 
   const points = chartPrices
     .map((p, index) => {
-      const x =
-        padding +
-        (index / Math.max(chartPrices.length - 1, 1)) * (width - padding * 2)
-      const y =
-        padding +
-        ((max - p.close) / range) * (height - padding * 2)
-
+      const x = padding + (index / Math.max(chartPrices.length - 1, 1)) * (width - padding * 2)
+      const y = padding + ((max - p.close) / range) * (height - padding * 2)
       return `${x},${y}`
     })
     .join(' ')
