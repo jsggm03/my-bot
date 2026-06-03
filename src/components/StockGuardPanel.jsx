@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 export default function StockGuardPanel({ onSendToChat }) {
   const [form, setForm] = useState({
-    stockName: '카카오',
+    stockName: '',
     averagePrice: '',
     currentPrice: '',
     quantity: '',
