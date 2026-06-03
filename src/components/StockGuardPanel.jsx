@@ -63,13 +63,6 @@ export default function StockGuardPanel({ onSendToChat }) {
     return n.toLocaleString()
   }
 
-  const formatSignedAmountShort = (value) => {
-    const n = Number(value)
-    if (!Number.isFinite(n)) return '-'
-    const sign = n > 0 ? '+' : n < 0 ? '-' : ''
-    return `${sign}${formatAmountShort(Math.abs(n))}`
-  }
-
   const formatPercent = (value) => {
     const n = Number(value)
     if (!Number.isFinite(n)) return '-'
@@ -88,14 +81,6 @@ export default function StockGuardPanel({ onSendToChat }) {
     if (form.horizon === '며칠~몇 주 보고 있어요') return '스윙 관점'
     if (form.horizon === '몇 달 이상 들고 갈 생각이에요') return '중장기 관점'
     return '미입력'
-  }
-
-  const getFlowActorText = (actorName, value) => {
-    const n = Number(value)
-    if (!Number.isFinite(n)) return `${actorName} 데이터 없음`
-    if (n > 0) return `${actorName} 순매수`
-    if (n < 0) return `${actorName} 순매도`
-    return `${actorName} 중립`
   }
 
   const buildFlowInterpretation = (period) => {
@@ -158,15 +143,17 @@ export default function StockGuardPanel({ onSendToChat }) {
   const buildFlowConsistency = (flowSummary) => {
     if (!flowSummary) return '수급 데이터 확인 필요'
 
-    const latestText = buildFlowInterpretation(flowSummary.latest || flowSummary)
+    const latestFlow = flowSummary.latest || {
+      individual: flowSummary.individual,
+      foreign: flowSummary.foreign,
+      institution: flowSummary.institution
+    }
+
+    const latestText = buildFlowInterpretation(latestFlow)
     const recent20Text = buildFlowInterpretation(flowSummary.recent20)
 
-    const latestForeign = Number(
-      flowSummary.latest?.foreign?.netQty ?? flowSummary.foreign?.netQty
-    )
-    const latestInstitution = Number(
-      flowSummary.latest?.institution?.netQty ?? flowSummary.institution?.netQty
-    )
+    const latestForeign = Number(latestFlow?.foreign?.netQty)
+    const latestInstitution = Number(latestFlow?.institution?.netQty)
     const recent20Foreign = Number(flowSummary.recent20?.foreign?.netQty)
     const recent20Institution = Number(flowSummary.recent20?.institution?.netQty)
 
@@ -297,7 +284,7 @@ export default function StockGuardPanel({ onSendToChat }) {
       reasonSummary.push('거래량이 약하면 가격 움직임의 신뢰도를 더 조심해서 봐야 합니다.')
     }
 
-    if (flowSignal) {
+    if (flowSignal && flowSignal !== '수급 데이터 확인 필요') {
       flags.push(flowSignal)
       reasonSummary.push(`최신일 수급은 '${flowSignal}'로 해석됩니다.`)
     }
@@ -710,379 +697,375 @@ ${buildAnalysisSummary()}
     <>
       <style>{`
         .mindGuardWorkspace {
-  height: 100%;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: 380px minmax(0, 1fr);
-  background: #fffaf3;
-  border-right: 1px solid rgba(120, 83, 45, 0.12);
-}
+          height: 100%;
+          min-height: 0;
+          display: grid;
+          grid-template-columns: 380px minmax(0, 1fr);
+          background: #fffaf3;
+          border-right: 1px solid rgba(120, 83, 45, 0.12);
+        }
 
-.mindGuardInputColumn {
-  min-height: 0;
-  overflow-y: auto;
-  padding: 24px 22px;
-  border-right: 1px solid rgba(120, 83, 45, 0.12);
-  background: #fff9ef;
-}
+        .mindGuardInputColumn {
+          min-height: 0;
+          overflow-y: auto;
+          padding: 24px 22px;
+          border-right: 1px solid rgba(120, 83, 45, 0.12);
+          background: #fff9ef;
+        }
 
-.mindGuardMainColumn {
-  min-height: 0;
-  overflow-y: auto;
-  padding: 30px;
-  background: #fffdf8;
-}
+        .mindGuardMainColumn {
+          min-height: 0;
+          overflow-y: auto;
+          padding: 30px;
+          background: #fffdf8;
+        }
 
-.brandTitle {
-  font-size: 22px;
-  font-weight: 900;
-  color: #3b2a1c;
-  margin: 0;
-}
+        .brandTitle {
+          font-size: 22px;
+          font-weight: 900;
+          color: #3b2a1c;
+          margin: 0;
+        }
 
-.brandSubtitle {
-  font-size: 13px;
-  color: #8a6a4a;
-  margin: 6px 0 18px;
-}
+        .brandSubtitle {
+          font-size: 13px;
+          color: #8a6a4a;
+          margin: 6px 0 18px;
+        }
 
-.sideSection {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(120, 83, 45, 0.12);
-}
+        .sideSection {
+          margin-top: 18px;
+          padding-top: 16px;
+          border-top: 1px solid rgba(120, 83, 45, 0.12);
+        }
 
-.sideSectionTitle {
-  margin: 0 0 10px;
-  font-size: 13px;
-  font-weight: 900;
-  color: #5b3d25;
-}
+        .sideSectionTitle {
+          margin: 0 0 10px;
+          font-size: 13px;
+          font-weight: 900;
+          color: #5b3d25;
+        }
 
-.inputStack {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-}
+        .inputStack {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
 
-.pillRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
+        .pillRow {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
 
-.candidateBox {
-  margin-top: 12px;
-  padding: 12px;
-  border-radius: 14px;
-  background: #fffbeb;
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  color: #78350f;
-  font-size: 13px;
-}
+        .candidateBox {
+          margin-top: 12px;
+          padding: 12px;
+          border-radius: 14px;
+          background: #fffbeb;
+          border: 1px solid rgba(245, 158, 11, 0.3);
+          color: #78350f;
+          font-size: 13px;
+        }
 
-.candidateTitle {
-  font-weight: 900;
-  margin-bottom: 8px;
-}
+        .candidateTitle {
+          font-weight: 900;
+          margin-bottom: 8px;
+        }
 
-.dashboardHeader {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
-  margin-bottom: 18px;
-}
+        .dashboardHeader {
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          align-items: flex-start;
+          margin-bottom: 18px;
+        }
 
-.dashboardTitle {
-  margin: 0;
-  font-size: 26px;
-  font-weight: 950;
-  color: #1f2937;
-}
+        .dashboardTitle {
+          margin: 0;
+          font-size: 26px;
+          font-weight: 950;
+          color: #1f2937;
+        }
 
-.dashboardSubtitle {
-  margin: 6px 0 0;
-  font-size: 14px;
-  color: #64748b;
-}
+        .dashboardSubtitle {
+          margin: 6px 0 0;
+          font-size: 14px;
+          color: #64748b;
+        }
 
-.statusBadge {
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 900;
-  background: #fff7ed;
-  color: #9a3412;
-  border: 1px solid rgba(251, 146, 60, 0.25);
-  white-space: nowrap;
-}
+        .statusBadge {
+          border-radius: 999px;
+          padding: 8px 12px;
+          font-size: 12px;
+          font-weight: 900;
+          background: #fff7ed;
+          color: #9a3412;
+          border: 1px solid rgba(251, 146, 60, 0.25);
+          white-space: nowrap;
+        }
 
-.emptyState {
-  height: 100%;
-  min-height: 420px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: #8a6a4a;
-}
+        .emptyState {
+          height: 100%;
+          min-height: 420px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          color: #8a6a4a;
+        }
 
-.emptyIcon {
-  font-size: 42px;
-  margin-bottom: 12px;
-}
+        .emptyIcon {
+          font-size: 42px;
+          margin-bottom: 12px;
+        }
 
-.stockIdentity {
-  padding: 16px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #0f172a, #334155);
-  color: white;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
-}
+        .stockIdentity {
+          padding: 16px;
+          border-radius: 18px;
+          background: linear-gradient(135deg, #0f172a, #334155);
+          color: white;
+          box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+        }
 
-.stockIdentityName {
-  font-size: 24px;
-  font-weight: 950;
-  margin: 0;
-}
+        .stockIdentityName {
+          font-size: 24px;
+          font-weight: 950;
+          margin: 0;
+        }
 
-.stockIdentityCode {
-  margin-top: 6px;
-  font-size: 13px;
-  color: rgba(255,255,255,0.72);
-}
+        .stockIdentityCode {
+          margin-top: 6px;
+          font-size: 13px;
+          color: rgba(255,255,255,0.72);
+        }
 
-.dashboardSection {
-  margin-top: 16px;
-  padding: 16px;
-  border-radius: 18px;
-  background: white;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
-}
+        .dashboardSection {
+          margin-top: 16px;
+          padding: 16px;
+          border-radius: 18px;
+          background: white;
+          border: 1px solid rgba(148, 163, 184, 0.22);
+          box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
+        }
 
-.dashboardSectionTitle {
-  margin: 0 0 12px;
-  font-size: 15px;
-  font-weight: 950;
-  color: #0f172a;
-}
+        .dashboardSectionTitle {
+          margin: 0 0 12px;
+          font-size: 15px;
+          font-weight: 950;
+          color: #0f172a;
+        }
 
-.metricGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 10px;
-}
+        .metricGrid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+          gap: 10px;
+        }
 
-.riskGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
-}
+        .riskGrid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 10px;
+        }
 
-.detailButtonRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
+        .detailButtonRow {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 12px;
+        }
 
-.detailPanel {
-  margin-top: 12px;
-  padding: 14px;
-  border-radius: 16px;
-  background: #f8fafc;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-}
+        .detailPanel {
+          margin-top: 12px;
+          padding: 14px;
+          border-radius: 16px;
+          background: #f8fafc;
+          border: 1px solid rgba(148, 163, 184, 0.25);
+        }
 
-.detailPanelTitle {
-  margin: 0 0 8px;
-  font-size: 14px;
-  font-weight: 950;
-  color: #0f172a;
-}
+        .detailPanelTitle {
+          margin: 0 0 8px;
+          font-size: 14px;
+          font-weight: 950;
+          color: #0f172a;
+        }
 
-.detailList {
-  margin: 0;
-  padding-left: 18px;
-  color: #475569;
-  font-size: 13px;
-  line-height: 1.7;
-}
+        .detailList {
+          margin: 0;
+          padding-left: 18px;
+          color: #475569;
+          font-size: 13px;
+          line-height: 1.7;
+        }
 
-.miniGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 10px;
-  margin-top: 10px;
-}
+        .miniGrid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+          gap: 10px;
+          margin-top: 10px;
+        }
 
-/* ─────────────────────────────
-   태블릿 / 작은 노트북
-───────────────────────────── */
+        @media (max-width: 1100px) {
+          .mindGuardWorkspace {
+            height: auto !important;
+            min-height: 100vh !important;
+            display: block !important;
+            overflow: visible !important;
+          }
 
-@media (max-width: 1100px) {
-  .mindGuardWorkspace {
-    height: auto;
-    min-height: 100vh;
-    display: block;
-    overflow: visible;
-  }
+          .mindGuardInputColumn {
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+            border-right: 0;
+            border-bottom: 1px solid rgba(120, 83, 45, 0.12);
+            padding: 20px;
+          }
 
-  .mindGuardInputColumn {
-    height: auto;
-    max-height: none;
-    overflow: visible;
-    border-right: 0;
-    border-bottom: 1px solid rgba(120, 83, 45, 0.12);
-    padding: 20px;
-  }
+          .mindGuardMainColumn {
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+            padding: 20px;
+          }
 
-  .mindGuardMainColumn {
-    height: auto;
-    max-height: none;
-    overflow: visible;
-    padding: 20px;
-  }
+          .dashboardHeader {
+            display: block;
+          }
 
-  .dashboardHeader {
-    display: block;
-  }
+          .statusBadge {
+            display: inline-block;
+            margin-top: 10px;
+          }
 
-  .statusBadge {
-    display: inline-block;
-    margin-top: 10px;
-  }
+          .metricGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
 
-  .metricGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+          .riskGrid {
+            grid-template-columns: 1fr;
+          }
 
-  .riskGrid {
-    grid-template-columns: 1fr;
-  }
+          .miniGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
 
-  .miniGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
+        @media (max-width: 640px) {
+          .mindGuardWorkspace {
+            height: auto !important;
+            min-height: 100vh !important;
+            display: block !important;
+            overflow: visible !important;
+          }
 
-/* ─────────────────────────────
-   모바일
-───────────────────────────── */
+          .mindGuardInputColumn {
+            height: auto !important;
+            max-height: none !important;
+            padding: 14px;
+            overflow: visible !important;
+          }
 
-@media (max-width: 640px) {
-  .mindGuardWorkspace {
-    height: auto;
-    min-height: 100vh;
-    display: block;
-    overflow: visible;
-  }
+          .mindGuardMainColumn {
+            height: auto !important;
+            max-height: none !important;
+            padding: 14px;
+            overflow: visible !important;
+          }
 
-  .mindGuardInputColumn {
-    padding: 14px;
-    overflow: visible;
-  }
+          .brandTitle {
+            font-size: 19px;
+          }
 
-  .mindGuardMainColumn {
-    padding: 14px;
-    overflow: visible;
-  }
+          .brandSubtitle {
+            font-size: 12px;
+            margin-bottom: 14px;
+          }
 
-  .brandTitle {
-    font-size: 19px;
-  }
+          .sideSection {
+            margin-top: 14px;
+            padding-top: 14px;
+          }
 
-  .brandSubtitle {
-    font-size: 12px;
-    margin-bottom: 14px;
-  }
+          .dashboardTitle {
+            font-size: 21px;
+          }
 
-  .sideSection {
-    margin-top: 14px;
-    padding-top: 14px;
-  }
+          .dashboardSubtitle {
+            font-size: 13px;
+          }
 
-  .dashboardTitle {
-    font-size: 21px;
-  }
+          .stockIdentity {
+            padding: 14px;
+            border-radius: 16px;
+          }
 
-  .dashboardSubtitle {
-    font-size: 13px;
-  }
+          .stockIdentityName {
+            font-size: 20px;
+          }
 
-  .stockIdentity {
-    padding: 14px;
-    border-radius: 16px;
-  }
+          .stockIdentityCode {
+            font-size: 12px;
+          }
 
-  .stockIdentityName {
-    font-size: 20px;
-  }
+          .dashboardSection {
+            padding: 14px;
+            border-radius: 16px;
+          }
 
-  .stockIdentityCode {
-    font-size: 12px;
-  }
+          .metricGrid {
+            grid-template-columns: 1fr;
+          }
 
-  .dashboardSection {
-    padding: 14px;
-    border-radius: 16px;
-  }
+          .riskGrid {
+            grid-template-columns: 1fr;
+          }
 
-  .metricGrid {
-    grid-template-columns: 1fr;
-  }
+          .miniGrid {
+            grid-template-columns: 1fr;
+          }
 
-  .riskGrid {
-    grid-template-columns: 1fr;
-  }
+          .detailButtonRow {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            overflow-y: hidden;
+            gap: 6px;
+            padding-bottom: 6px;
+            scrollbar-width: thin;
+          }
 
-  .miniGrid {
-    grid-template-columns: 1fr;
-  }
+          .detailButtonRow button {
+            flex: 0 0 auto;
+            white-space: nowrap;
+          }
 
-  .detailButtonRow {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    gap: 6px;
-    padding-bottom: 6px;
-    scrollbar-width: thin;
-  }
+          .detailList {
+            font-size: 12px;
+            line-height: 1.65;
+          }
+        }
 
-  .detailButtonRow button {
-    flex: 0 0 auto;
-    white-space: nowrap;
-  }
+        @media (max-width: 420px) {
+          .mindGuardInputColumn {
+            padding: 12px;
+          }
 
-  .detailList {
-    font-size: 12px;
-    line-height: 1.65;
-  }
-}
+          .mindGuardMainColumn {
+            padding: 12px;
+          }
 
-/* 아주 작은 모바일 */
-@media (max-width: 420px) {
-  .mindGuardInputColumn {
-    padding: 12px;
-  }
+          .dashboardTitle {
+            font-size: 20px;
+          }
 
-  .mindGuardMainColumn {
-    padding: 12px;
-  }
+          .dashboardSection {
+            padding: 12px;
+          }
 
-  .dashboardTitle {
-    font-size: 20px;
-  }
-
-  .dashboardSection {
-    padding: 12px;
-  }
-
-  .detailPanel {
-    padding: 12px;
-  }
-}
+          .detailPanel {
+            padding: 12px;
+          }
+        }
       `}</style>
 
       <div className="mindGuardWorkspace">
@@ -1401,7 +1384,6 @@ ${buildAnalysisSummary()}
                 formatNumber={formatNumber}
                 formatSignedNumber={formatSignedNumber}
                 formatAmountShort={formatAmountShort}
-                formatSignedAmountShort={formatSignedAmountShort}
                 buildFlowInterpretation={buildFlowInterpretation}
                 buildFlowConsistency={buildFlowConsistency}
               />
@@ -1485,9 +1467,7 @@ function DetailPanel({
 
   const formatDateLabel = (dateText) => {
     const value = String(dateText || '')
-
     if (value.length !== 8) return value || '기준일 정보 없음'
-
     return `${value.slice(0, 4)}.${value.slice(4, 6)}.${value.slice(6, 8)} 기준`
   }
 
