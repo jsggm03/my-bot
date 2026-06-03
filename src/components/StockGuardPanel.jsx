@@ -453,22 +453,30 @@ export default function StockGuardPanel({ onSendToChat }) {
   }
 
   useEffect(() => {
-    const name = form.stockName.trim()
+  const name = form.stockName.trim()
 
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current)
+  if (debounceTimerRef.current) {
+    clearTimeout(debounceTimerRef.current)
+  }
+
+  debounceTimerRef.current = setTimeout(() => {
+    if (name.length >= 2 && name !== lastLoadedNameRef.current) {
+      loadStock(name)
     }
 
-    debounceTimerRef.current = setTimeout(() => {
-      if (name && name !== lastLoadedNameRef.current) {
-        loadStock(name)
-      }
-    }, 800)
-
-    return () => {
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+    if (name.length === 0) {
+      setStockData(null)
+      setCandidates([])
+      setStockError('')
+      updateForm('currentPrice', '')
+      lastLoadedNameRef.current = ''
     }
-  }, [form.stockName])
+  }, 800)
+
+  return () => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+  }
+}, [form.stockName])
 
   const handleCandidateClick = (candidate) => {
     setCandidates([])
