@@ -383,30 +383,18 @@ export default function StockGuardPanel({ onSendToChat }) {
     const profitAmount =
       holdingValue !== null && investedAmount !== null ? holdingValue - investedAmount : null
 
-    const stopLossPrice = avg > 0 ? avg * (1 + stopLossRate / 100) : null
-    const targetPrice = avg > 0 ? avg * (1 + targetRate / 100) : null
-
     const stopLossReached = profitRate !== null ? profitRate <= stopLossRate : false
-    const targetReached = profitRate !== null ? profitRate >= targetRate : false
 
     const canCalcAddBuy = avg > 0 && current > 0 && quantity > 0 && tradeQuantity > 0
     const newAverageAfterBuy = canCalcAddBuy
       ? (avg * quantity + current * tradeQuantity) / (quantity + tradeQuantity)
       : null
 
-    const addedBuyAmount = current > 0 && tradeQuantity > 0 ? current * tradeQuantity : null
-
     return {
       profitRate,
-      holdingValue,
-      investedAmount,
       profitAmount,
-      stopLossPrice,
-      targetPrice,
       stopLossReached,
-      targetReached,
-      newAverageAfterBuy,
-      addedBuyAmount
+      newAverageAfterBuy
     }
   }, [form])
 
@@ -1246,9 +1234,7 @@ ${buildAnalysisSummary()}
               />
               <InfoCard
                 label="추가매수 후 평단"
-                value={
-                  analysis.newAverageAfterBuy !== null ? formatWon(analysis.newAverageAfterBuy) : '-'
-                }
+                value={analysis.newAverageAfterBuy !== null ? formatWon(analysis.newAverageAfterBuy) : '-'}
               />
             </div>
           </section>
@@ -1538,7 +1524,7 @@ function DetailPanel({
           </div>
 
           <p style={safeNoticeStyle}>
-            장기 일봉 데이터가 충분할 때만 과거 유사 구간을 표시합니다. 데이터가 부족하면 예측처럼 보이는 값을 만들지 않습니다.
+            장기 일봉 데이터가 충분할 때만 과거 유사 구간을 표시합니다.
           </p>
         </div>
       )
@@ -1567,19 +1553,11 @@ function DetailPanel({
           />
           <MiniInsightCard
             title="20거래일 내 최대 추가 하락"
-            text={
-              s.maxExtraDrawdown20d !== null && s.maxExtraDrawdown20d !== undefined
-                ? `${s.maxExtraDrawdown20d}%`
-                : '계산 불가'
-            }
+            text={s.maxExtraDrawdown20d !== null && s.maxExtraDrawdown20d !== undefined ? `${s.maxExtraDrawdown20d}%` : '계산 불가'}
           />
           <MiniInsightCard
             title="60거래일 내 최대 추가 하락"
-            text={
-              s.maxExtraDrawdown60d !== null && s.maxExtraDrawdown60d !== undefined
-                ? `${s.maxExtraDrawdown60d}%`
-                : '계산 불가'
-            }
+            text={s.maxExtraDrawdown60d !== null && s.maxExtraDrawdown60d !== undefined ? `${s.maxExtraDrawdown60d}%` : '계산 불가'}
           />
         </div>
 
@@ -1622,10 +1600,10 @@ function DetailPanel({
       <div className="miniGrid">
         <MetricInsightCard title="현재가" value={formatWon(summary.currentPrice)} comment="현재 판단의 기준 가격입니다." />
         <MetricInsightCard title="전일 등락률" value={`${current.previousDayRate ?? '-'}%`} comment="하루 움직임만으로 원인을 단정하지 않는 것이 좋습니다." />
-        <MetricInsightCard title="전일 대비" value={formatWon(current.previousDayDiff)} comment="전일 대비 변화폭입니다. 단기 감정 반응을 유발할 수 있습니다." />
-        <MetricInsightCard title="90일 고점" value={formatWon(summary.high90d)} comment="최근 고점 기준입니다. 고점 대비 위치를 함께 봐야 합니다." />
-        <MetricInsightCard title="90일 저점" value={formatWon(summary.low90d)} comment="최근 저점 기준입니다. 저점 대비 반등 정도를 확인합니다." />
-        <MetricInsightCard title="고점 대비" value={`${summary.drawdownFromHigh}%`} comment="고점 대비 하락폭이 클수록 손실 회피 감정이 강해질 수 있습니다." />
+        <MetricInsightCard title="전일 대비" value={formatWon(current.previousDayDiff)} comment="전일 대비 변화폭입니다." />
+        <MetricInsightCard title="90일 고점" value={formatWon(summary.high90d)} comment="최근 고점 기준입니다." />
+        <MetricInsightCard title="90일 저점" value={formatWon(summary.low90d)} comment="최근 저점 기준입니다." />
+        <MetricInsightCard title="고점 대비" value={`${summary.drawdownFromHigh}%`} comment="고점 대비 하락폭입니다." />
         <MetricInsightCard title="저점 대비" value={`${summary.reboundFromLow}%`} comment="저점에서 얼마나 회복했는지 보는 지표입니다." />
         <MetricInsightCard title="누적 거래량" value={formatNumber(current.accumulatedVolume)} comment="거래량은 관심이 몰렸는지 확인하는 보조 지표입니다." />
         <MetricInsightCard title="누적 거래대금" value={formatAmountShort(current.accumulatedAmount)} comment="거래대금은 시장 관심도를 보는 보조 지표입니다." />
